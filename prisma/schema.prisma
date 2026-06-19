@@ -1,0 +1,257 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model Character {
+  id         String           @id @default(cuid())
+  name       String
+  avatarPath String?
+  level      Int              @default(1)
+  currentExp Int              @default(0)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  expEntries ExpTransaction[]
+}
+
+model ExpTransaction {
+  id          String    @id @default(cuid())
+  characterId String
+  amount      Int
+  sourceType  String
+  sourceId    String
+  reason      String
+  createdAt   DateTime  @default(now())
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceType, sourceId])
+  @@index([characterId, createdAt])
+}
+
+model MainQuestCategory {
+  id        String      @id @default(cuid())
+  title     String      @unique
+  sortOrder Int         @default(0)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  quests    MainQuest[]
+}
+
+model MainQuest {
+  id                 String            @id @default(cuid())
+  categoryId         String
+  title              String
+  description        String            @default("")
+  progressType       String
+  targetValue        Int               @default(100)
+  currentValue       Int               @default(0)
+  unit               String            @default("%")
+  status             String            @default("DRAFT")
+  startDate          DateTime?
+  completedDate      DateTime?
+  expReward          Int               @default(0)
+  deletedAt          DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  rootAdventureLogId String?           @unique
+  category           MainQuestCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  logs               AdventureLog[]    @relation("QuestEvents")
+  rootAdventureLog   AdventureLog?     @relation("MainQuestRoot", fields: [rootAdventureLogId], references: [id], onDelete: SetNull)
+  locations          MapLocation[]
+  rewards            Reward[]
+  attachments        Attachment[]
+
+  @@index([categoryId, status])
+}
+
+model DailyQuest {
+  id          String                 @id @default(cuid())
+  title       String
+  description String                 @default("")
+  expReward   Int                    @default(0)
+  daysOfWeek  String
+  resetTime   String                 @default("00:00")
+  timezone    String                 @default("Asia/Taipei")
+  isActive    Boolean                @default(true)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  completions DailyQuestCompletion[]
+  attachments Attachment[]
+}
+
+model DailyQuestCompletion {
+  id           String     @id @default(cuid())
+  dailyQuestId String
+  questDate    String
+  completedAt  DateTime   @default(now())
+  expAwarded   Int
+  dailyQuest   DailyQuest @relation(fields: [dailyQuestId], references: [id], onDelete: Cascade)
+
+  @@unique([dailyQuestId, questDate])
+}
+
+model Skill {
+  id          String         @id @default(cuid())
+  title       String         @unique
+  description String         @default("")
+  level       Int            @default(1)
+  currentExp  Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  records     SkillRecord[]
+  logs        AdventureLog[]
+  attachments Attachment[]
+}
+
+model SkillRecord {
+  id         String   @id @default(cuid())
+  skillId    String
+  title      String
+  notes      String   @default("")
+  recordDate DateTime @default(now())
+  expEarned  Int      @default(0)
+  createdAt  DateTime @default(now())
+  skill      Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+}
+
+model AdventureLog {
+  id            String         @id @default(cuid())
+  eventType     String
+  title         String
+  description   String         @default("")
+  eventDate     DateTime       @default(now())
+  startDate     DateTime       @default(now())
+  endDate       DateTime?
+  status        String         @default("COMPLETED")
+  expEarned     Int            @default(0)
+  origin        String         @default("SYSTEM")
+  sourceType    String?
+  sourceId      String?
+  mainQuestId   String?
+  locationId    String?
+  skillId       String?
+  achievementId String?
+  rewardId      String?
+  parentId      String?
+  deletedAt     DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  mainQuest     MainQuest?     @relation("QuestEvents", fields: [mainQuestId], references: [id], onDelete: SetNull)
+  rootForQuest  MainQuest?     @relation("MainQuestRoot")
+  parent        AdventureLog?  @relation("AdventureLogTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children      AdventureLog[] @relation("AdventureLogTree")
+  location      MapLocation?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  skill         Skill?         @relation(fields: [skillId], references: [id], onDelete: SetNull)
+  achievement   Achievement?   @relation(fields: [achievementId], references: [id], onDelete: SetNull)
+  reward        Reward?        @relation(fields: [rewardId], references: [id], onDelete: SetNull)
+  attachments   Attachment[]
+
+  @@index([eventDate])
+  @@index([eventType, eventDate])
+  @@index([deletedAt, eventDate])
+  @@index([deletedAt, startDate])
+  @@index([parentId, startDate])
+}
+
+model MapLocation {
+  id           String         @id @default(cuid())
+  mainQuestId  String?
+  title        String
+  eventDate    DateTime
+  description  String         @default("")
+  notes        String         @default("")
+  positionX    Int            @default(0)
+  positionY    Int            @default(0)
+  locationType String         @default("MILESTONE")
+  deletedAt    DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  mainQuest    MainQuest?     @relation(fields: [mainQuestId], references: [id], onDelete: SetNull)
+  logs         AdventureLog[]
+  outgoing     MapEdge[]      @relation("MapEdgeSource")
+  incoming     MapEdge[]      @relation("MapEdgeTarget")
+  attachments  Attachment[]
+}
+
+model MapEdge {
+  id       String      @id @default(cuid())
+  sourceId String
+  targetId String
+  label    String?
+  source   MapLocation @relation("MapEdgeSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  target   MapLocation @relation("MapEdgeTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId])
+}
+
+model Achievement {
+  id            String         @id @default(cuid())
+  title         String
+  description   String         @default("")
+  completed     Boolean        @default(false)
+  completedDate DateTime?
+  notes         String         @default("")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  logs          AdventureLog[]
+  attachments   Attachment[]
+}
+
+model Reward {
+  id                String         @id @default(cuid())
+  mainQuestId       String?
+  conditionType     String
+  conditionSourceId String?
+  targetCount       Int?
+  rewardDescription String
+  unlocked          Boolean        @default(false)
+  unlockedDate      DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  mainQuest         MainQuest?     @relation(fields: [mainQuestId], references: [id], onDelete: SetNull)
+  logs              AdventureLog[]
+}
+
+model Todo {
+  id        String    @id @default(cuid())
+  title     String
+  priority  String    @default("NORMAL")
+  dueDate   DateTime?
+  completed Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Attachment {
+  id             String        @id @default(cuid())
+  storageName    String        @unique
+  originalName   String
+  mimeType       String
+  sizeBytes      Int
+  checksum       String
+  mainQuestId    String?
+  dailyQuestId   String?
+  skillId        String?
+  achievementId  String?
+  adventureLogId String?
+  mapLocationId  String?
+  createdAt      DateTime      @default(now())
+  mainQuest      MainQuest?    @relation(fields: [mainQuestId], references: [id], onDelete: Cascade)
+  dailyQuest     DailyQuest?   @relation(fields: [dailyQuestId], references: [id], onDelete: Cascade)
+  skill          Skill?        @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  achievement    Achievement?  @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  adventureLog   AdventureLog? @relation(fields: [adventureLogId], references: [id], onDelete: Cascade)
+  mapLocation    MapLocation?  @relation(fields: [mapLocationId], references: [id], onDelete: Cascade)
+
+  @@index([adventureLogId])
+}
