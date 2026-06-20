@@ -29,6 +29,7 @@ export function CreateMainQuestForm({ categories }: { categories: CategoryOption
         targetValue: Number(data.get("targetValue")),
         currentValue: Number(data.get("currentValue")),
         unit: data.get("unit"),
+        placeRootOnWorldMap: data.get("placeRootOnWorldMap") === "true",
         ...(startDate ? { startDate } : {}),
       }),
     });
@@ -59,6 +60,7 @@ export function CreateMainQuestForm({ categories }: { categories: CategoryOption
         <label>Current value<input name="currentValue" type="number" min={0} defaultValue={0} required /></label>
         <label>Target value<input name="targetValue" type="number" min={1} defaultValue={100} required /></label>
         <label>Start date<input name="startDate" type="date" /></label>
+        <label className="milestone-toggle quest-root-map-toggle"><input name="placeRootOnWorldMap" type="checkbox" value="true" /><span><strong>Place root on World Map</strong><small>Create a milestone location for the quest root.</small></span></label>
       </div>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
       <button className="pixel-button quest-submit" type="submit" disabled={pending || !categories.length}>{pending ? "Creating quest..." : "Create Main Quest"}</button>

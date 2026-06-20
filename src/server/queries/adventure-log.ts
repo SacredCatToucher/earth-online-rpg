@@ -58,7 +58,9 @@ export async function listAdventureLogs(filters: AdventureLogFilters) {
       roots.push(node);
     }
   }
-  for (const node of nodes.values()) node.children.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  for (const node of nodes.values()) {
+    node.children.sort((a, b) => a.startDate.getTime() - b.startDate.getTime() || a.createdAt.getTime() - b.createdAt.getTime());
+  }
   const totalBranches = roots.length;
   return {
     entries: roots.slice((page - 1) * pageSize, page * pageSize),

@@ -13,8 +13,13 @@ async function createCategory(suffix: string) {
 
 describe("Main Quest backend foundation", () => {
   afterAll(async () => {
+    const locations = await db.mapLocation.findMany({
+      where: { title: { startsWith: marker } },
+      select: { id: true },
+    });
     await db.mainQuest.deleteMany({ where: { title: { startsWith: marker } } });
     await db.adventureLog.deleteMany({ where: { title: { startsWith: marker } } });
+    await db.mapLocation.deleteMany({ where: { id: { in: locations.map((location) => location.id) } } });
     await db.mainQuestCategory.deleteMany({ where: { title: { startsWith: marker } } });
     await db.$disconnect();
   });
@@ -35,6 +40,27 @@ describe("Main Quest backend foundation", () => {
     expect(quest.rootAdventureLog?.parentId).toBeNull();
     expect(quest.rootAdventureLog?.status).toBe("ONGOING");
     expect(quest.rootAdventureLog?.startDate.toISOString()).toBe("2026-06-19T12:00:00.000Z");
+    expect(quest.rootAdventureLog?.locationId).toBeNull();
+  });
+
+  it("optionally places the Main Quest root on the World Map", async () => {
+    const category = await createCategory("mapped root category");
+    const quest = await createMainQuest({
+      categoryId: category.id,
+      title: `${marker} mapped root`,
+      description: "A quest root that should become a location.",
+      progressType: "COUNT",
+      startDate: "2026-02-03",
+      placeRootOnWorldMap: true,
+    });
+
+    expect(quest.rootAdventureLog?.locationId).toBeTruthy();
+    const location = await db.mapLocation.findUniqueOrThrow({ where: { id: quest.rootAdventureLog!.locationId! } });
+    expect(location.title).toBe(quest.title);
+    expect(location.description).toBe(quest.description);
+    expect(location.eventDate.toISOString()).toBe("2026-02-03T12:00:00.000Z");
+    expect(location.locationType).toBe("JOURNAL_MILESTONE");
+    expect(await db.mapEdge.count({ where: { OR: [{ sourceId: location.id }, { targetId: location.id }] } })).toBe(0);
   });
 
   it("prevents two active Main Quests in one category", async () => {
@@ -106,6 +132,7 @@ describe("Main Quest backend foundation", () => {
       progressType: "COUNT",
       status: "ACTIVE",
       startDate: "2026-01-01",
+      placeRootOnWorldMap: true,
     });
     const result = await completeMainQuest(quest.id, "2026-06-20");
     const root = await db.adventureLog.findUniqueOrThrow({ where: { id: quest.rootAdventureLogId! } });
@@ -119,6 +146,8 @@ describe("Main Quest backend foundation", () => {
     expect(result.event.parentId).toBe(root.id);
     expect(result.event.expEarned).toBe(0);
     expect(result.event.locationId).toBeNull();
+    expect(root.locationId).toBeTruthy();
+    expect(await db.mapLocation.count({ where: { id: root.locationId! } })).toBe(1);
   });
 
   it("rejects completion for a quest that is not active", async () => {

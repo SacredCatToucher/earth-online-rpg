@@ -121,4 +121,26 @@ describe("Adventure Log", () => {
       ),
     ).rejects.toThrow("System events cannot be rewritten");
   });
+
+  it("orders children oldest-to-newest while keeping root branches newest-first", async () => {
+    const olderRoot = await createManualJournalEntry({ title: `${marker} older ordering root`, startDate: "2025-01-01" }, []);
+    const newerRoot = await createManualJournalEntry({ title: `${marker} newer ordering root`, startDate: "2026-01-01" }, []);
+    const firstChild = await createManualJournalEntry(
+      { title: `${marker} first same-day child`, startDate: "2025-02-01", parentId: olderRoot.id },
+      [],
+    );
+    const secondChild = await createManualJournalEntry(
+      { title: `${marker} second same-day child`, startDate: "2025-02-01", parentId: olderRoot.id },
+      [],
+    );
+    await db.adventureLog.update({ where: { id: firstChild.id }, data: { createdAt: new Date("2025-02-01T01:00:00.000Z") } });
+    await db.adventureLog.update({ where: { id: secondChild.id }, data: { createdAt: new Date("2025-02-01T02:00:00.000Z") } });
+
+    const result = await listAdventureLogs({ search: marker });
+    const root = result.entries.find((entry) => entry.id === olderRoot.id);
+    expect(result.entries.findIndex((entry) => entry.id === newerRoot.id)).toBeLessThan(
+      result.entries.findIndex((entry) => entry.id === olderRoot.id),
+    );
+    expect(root?.children.map((child) => child.id)).toEqual([firstChild.id, secondChild.id]);
+  });
 });

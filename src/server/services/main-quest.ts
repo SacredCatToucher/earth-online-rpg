@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { eventDateFromInput, localDateInputValue } from "@/lib/dates";
-import { createSystemAdventureEvent } from "@/server/services/adventure-log";
+import { createSystemAdventureEvent, journalMilestoneCreateData } from "@/server/services/adventure-log";
 
 export const createMainQuestInput = z
   .object({
@@ -17,6 +17,7 @@ export const createMainQuestInput = z
     status: z.enum(["DRAFT", "ACTIVE"]).default("DRAFT"),
     startDate: z.iso.date().optional(),
     rootAdventureLogId: z.string().min(1).optional(),
+    placeRootOnWorldMap: z.boolean().default(false),
   })
   .superRefine((value, context) => {
     if (value.currentValue > value.targetValue) {
@@ -86,7 +87,17 @@ export async function createMainQuest(input: CreateMainQuestInput) {
       if (rootAdventureLogId) {
         const root = await tx.adventureLog.findUnique({
           where: { id: rootAdventureLogId },
-          select: { id: true, parentId: true, deletedAt: true, mainQuestId: true, rootForQuest: { select: { id: true } } },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            startDate: true,
+            locationId: true,
+            parentId: true,
+            deletedAt: true,
+            mainQuestId: true,
+            rootForQuest: { select: { id: true } },
+          },
         });
         if (!root || root.deletedAt) throw new Error("Root Adventure Log entry not found.");
         if (root.parentId) throw new Error("A Main Quest root must be a root Adventure Log entry.");
@@ -94,7 +105,26 @@ export async function createMainQuest(input: CreateMainQuestInput) {
 
         const treeIds = await collectDescendantIds(tx, root.id);
         await tx.adventureLog.updateMany({ where: { id: { in: treeIds } }, data: { mainQuestId: questId } });
+        if (parsed.placeRootOnWorldMap && !root.locationId) {
+          const location = await tx.mapLocation.create({
+            data: await journalMilestoneCreateData(tx, {
+              title: root.title,
+              description: root.description,
+              eventDate: root.startDate,
+            }),
+          });
+          await tx.adventureLog.update({ where: { id: root.id }, data: { locationId: location.id } });
+        }
       } else {
+        const location = parsed.placeRootOnWorldMap
+          ? await tx.mapLocation.create({
+              data: await journalMilestoneCreateData(tx, {
+                title: parsed.title,
+                description: parsed.description,
+                eventDate: startDate,
+              }),
+            })
+          : null;
         const root = await tx.adventureLog.create({
           data: {
             eventType: "MANUAL_JOURNAL_ENTRY",
@@ -107,6 +137,7 @@ export async function createMainQuest(input: CreateMainQuestInput) {
             sourceType: "MAIN_QUEST",
             sourceId: questId,
             mainQuestId: questId,
+            locationId: location?.id,
           },
         });
         rootAdventureLogId = root.id;

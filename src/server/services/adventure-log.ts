@@ -39,6 +39,14 @@ export function positionForLocation(index: number) {
   };
 }
 
+export async function journalMilestoneCreateData(
+  tx: Prisma.TransactionClient,
+  entry: { title: string; description: string; eventDate: Date },
+) {
+  const position = positionForLocation(await tx.mapLocation.count({ where: { deletedAt: null } }));
+  return { ...entry, locationType: "JOURNAL_MILESTONE", ...position };
+}
+
 async function validateParent(tx: Prisma.TransactionClient, entryId: string, parentId: string | null) {
   if (!parentId) return null;
   if (parentId === entryId) throw new Error("An entry cannot be its own parent.");
@@ -70,7 +78,9 @@ export async function createManualJournalEntry(input: JournalInput, files: File[
       const parent = await validateParent(tx, id, parsed.parentId);
       const startDate = eventDateFromInput(parsed.startDate);
       const endDate = parsed.endDate ? eventDateFromInput(parsed.endDate) : null;
-      const position = parsed.isMilestone ? positionForLocation(await tx.mapLocation.count({ where: { deletedAt: null } })) : null;
+      const location = parsed.isMilestone
+        ? await journalMilestoneCreateData(tx, { title: parsed.title, description: parsed.description, eventDate: startDate })
+        : null;
       return tx.adventureLog.create({
         data: {
           id,
@@ -85,9 +95,7 @@ export async function createManualJournalEntry(input: JournalInput, files: File[
           parent: parsed.parentId ? { connect: { id: parsed.parentId } } : undefined,
           mainQuest: parent?.mainQuestId ? { connect: { id: parent.mainQuestId } } : undefined,
           attachments: { create: stored },
-          location: parsed.isMilestone
-            ? { create: { title: parsed.title, description: parsed.description, eventDate: startDate, locationType: "JOURNAL_MILESTONE", ...position } }
-            : undefined,
+          location: location ? { create: location } : undefined,
         },
         include: { attachments: true, location: true },
       });
@@ -124,9 +132,8 @@ export async function updateManualJournalEntry(id: string, input: JournalInput, 
           data: { title: parsed.title, description: parsed.description, eventDate: startDate, deletedAt: null },
         });
       } else if (parsed.isMilestone) {
-        const position = positionForLocation(await tx.mapLocation.count({ where: { deletedAt: null } }));
         const location = await tx.mapLocation.create({
-          data: { title: parsed.title, description: parsed.description, eventDate: startDate, locationType: "JOURNAL_MILESTONE", ...position },
+          data: await journalMilestoneCreateData(tx, { title: parsed.title, description: parsed.description, eventDate: startDate }),
         });
         locationId = location.id;
       } else {
