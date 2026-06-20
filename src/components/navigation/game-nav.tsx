@@ -4,12 +4,12 @@ const items = [
   { label: "World Map", href: "/", enabled: true, key: "map" },
   { label: "Adventure Log", href: "/adventure-log", enabled: true, key: "journal" },
   { label: "Main Quests", href: "/main-quests", enabled: true, key: "quests" },
-  { label: "Daily Quests", href: "#", enabled: false, key: "daily" },
+  { label: "Daily Quests", href: "/daily-quests", enabled: true, key: "daily" },
   { label: "Skills", href: "#", enabled: false, key: "skills" },
   { label: "Achievements", href: "#", enabled: false, key: "achievements" },
 ];
 
-export function GameNav({ active }: { active: "map" | "journal" | "quests" }) {
+export function GameNav({ active }: { active: "map" | "journal" | "quests" | "daily" }) {
   return (
     <nav className="rpg-nav" aria-label="Main menu">
       {items.map((item) =>
