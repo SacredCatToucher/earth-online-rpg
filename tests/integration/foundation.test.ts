@@ -1,13 +1,17 @@
 import "dotenv/config";
+import { randomUUID } from "node:crypto";
 import AdmZip from "adm-zip";
 import { afterAll, describe, expect, it } from "vitest";
 import { BACKUP_FORMAT, DEFAULT_QUEST_CATEGORIES, DEFAULT_SKILLS } from "../../src/lib/constants";
 import { db } from "../../src/lib/db";
 import { createBackupArchive, restoreBackupArchive } from "../../src/server/services/backup";
 
+const marker = `Phase 1 foundation test ${randomUUID()}`;
+
 describe("Phase 1 foundation", () => {
   afterAll(async () => {
-    await db.mainQuest.deleteMany({ where: { title: { startsWith: "Integration test" } } });
+    await db.mainQuest.deleteMany({ where: { title: { startsWith: marker } } });
+    await db.mainQuestCategory.deleteMany({ where: { title: { startsWith: marker } } });
     await db.$disconnect();
   });
 
@@ -21,13 +25,13 @@ describe("Phase 1 foundation", () => {
   });
 
   it("allows only one active Main Quest per category", async () => {
-    const category = await db.mainQuestCategory.findUniqueOrThrow({ where: { title: "Career" } });
+    const category = await db.mainQuestCategory.create({ data: { title: `${marker} category` } });
     await db.mainQuest.create({
-      data: { categoryId: category.id, title: "Integration test one", progressType: "PERCENTAGE", status: "ACTIVE" },
+      data: { categoryId: category.id, title: `${marker} active one`, progressType: "PERCENTAGE", status: "ACTIVE" },
     });
     await expect(
       db.mainQuest.create({
-        data: { categoryId: category.id, title: "Integration test two", progressType: "PERCENTAGE", status: "ACTIVE" },
+        data: { categoryId: category.id, title: `${marker} active two`, progressType: "PERCENTAGE", status: "ACTIVE" },
       }),
     ).rejects.toThrow();
   });
