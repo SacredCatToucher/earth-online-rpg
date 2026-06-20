@@ -27,6 +27,12 @@ export const createMainQuestInput = z
 
 export type CreateMainQuestInput = z.input<typeof createMainQuestInput>;
 
+export const activateMainQuestInput = z.object({
+  startDate: z.iso.date(),
+});
+
+export type ActivateMainQuestInput = z.input<typeof activateMainQuestInput>;
+
 export const updateMainQuestProgressInput = z.object({
   currentValue: z.number().int().nonnegative(),
 });
@@ -199,6 +205,52 @@ export async function completeMainQuest(id: string, completedDate?: string) {
 
     return { quest: completedQuest, event };
   });
+}
+
+export async function activateMainQuest(id: string, input: ActivateMainQuestInput) {
+  const parsed = activateMainQuestInput.parse(input);
+  const startDate = eventDateFromInput(parsed.startDate);
+
+  try {
+    return await db.$transaction(async (tx) => {
+      const quest = await tx.mainQuest.findFirst({
+        where: { id, deletedAt: null },
+        include: { rootAdventureLog: true },
+      });
+      if (!quest) throw new Error("Main Quest not found.");
+      if (quest.status !== "DRAFT") throw new Error("Only draft Main Quests can be activated.");
+
+      const activeQuest = await tx.mainQuest.findFirst({
+        where: { categoryId: quest.categoryId, status: "ACTIVE", deletedAt: null },
+        select: { id: true },
+      });
+      if (activeQuest) throw new Error("This category already has an active Main Quest.");
+
+      if (quest.rootAdventureLog) {
+        await tx.adventureLog.update({
+          where: { id: quest.rootAdventureLog.id },
+          data: { status: "ONGOING", startDate, eventDate: startDate, endDate: null },
+        });
+        if (quest.rootAdventureLog.locationId) {
+          await tx.mapLocation.update({
+            where: { id: quest.rootAdventureLog.locationId },
+            data: { eventDate: startDate },
+          });
+        }
+      }
+
+      return tx.mainQuest.update({
+        where: { id: quest.id },
+        data: { status: "ACTIVE", startDate },
+        include: { category: true, rootAdventureLog: true },
+      });
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new Error("This category already has an active Main Quest.");
+    }
+    throw error;
+  }
 }
 
 export async function updateMainQuestProgress(id: string, input: UpdateMainQuestProgressInput) {

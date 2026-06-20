@@ -3,7 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { db } from "../../src/lib/db";
 import { listAdventureLogs } from "../../src/server/queries/adventure-log";
 import { createManualJournalEntry } from "../../src/server/services/adventure-log";
-import { completeMainQuest, createMainQuest, updateMainQuestProgress } from "../../src/server/services/main-quest";
+import { activateMainQuest, completeMainQuest, createMainQuest, updateMainQuestProgress } from "../../src/server/services/main-quest";
 
 const marker = "Phase 4 Main Quest test";
 
@@ -122,6 +122,121 @@ describe("Main Quest backend foundation", () => {
     expect(grandchild.mainQuestId).toBe(quest.id);
     expect(root?.children.some((entry) => entry.id === child.id)).toBe(true);
     expect(root?.children.find((entry) => entry.id === child.id)?.children.some((entry) => entry.id === grandchild.id)).toBe(true);
+  });
+
+  it("activates an unmapped draft and synchronizes its root without changing progress or creating events", async () => {
+    const category = await createCategory("unmapped activation category");
+    const quest = await createMainQuest({
+      categoryId: category.id,
+      title: `${marker} unmapped activation`,
+      progressType: "COUNT",
+      targetValue: 12,
+      currentValue: 4,
+      status: "DRAFT",
+    });
+
+    const activated = await activateMainQuest(quest.id, { startDate: "2026-03-04" });
+    const root = await db.adventureLog.findUniqueOrThrow({ where: { id: quest.rootAdventureLogId! } });
+
+    expect(activated.status).toBe("ACTIVE");
+    expect(activated.startDate?.toISOString()).toBe("2026-03-04T12:00:00.000Z");
+    expect(activated.currentValue).toBe(4);
+    expect(activated.targetValue).toBe(12);
+    expect(root.status).toBe("ONGOING");
+    expect(root.startDate.toISOString()).toBe("2026-03-04T12:00:00.000Z");
+    expect(root.eventDate.toISOString()).toBe("2026-03-04T12:00:00.000Z");
+    expect(root.endDate).toBeNull();
+    expect(root.locationId).toBeNull();
+    expect(await db.mapLocation.count({ where: { logs: { some: { id: root.id } } } })).toBe(0);
+    expect(await db.adventureLog.count({ where: { mainQuestId: quest.id, eventType: "QUEST_COMPLETED" } })).toBe(0);
+  });
+
+  it("activates and completes a mapped draft without replacing its location or mapping the completion event", async () => {
+    const category = await createCategory("mapped activation category");
+    const quest = await createMainQuest({
+      categoryId: category.id,
+      title: `${marker} mapped activation`,
+      description: "Original quest description.",
+      progressType: "PERCENTAGE",
+      status: "DRAFT",
+      placeRootOnWorldMap: true,
+    });
+    const locationId = quest.rootAdventureLog!.locationId!;
+    const locationBefore = await db.mapLocation.update({
+      where: { id: locationId },
+      data: {
+        title: `${marker} preserved map title`,
+        description: "Preserve this map description.",
+        locationType: "JOURNAL_MILESTONE",
+        positionX: 73,
+        positionY: 41,
+      },
+    });
+
+    await activateMainQuest(quest.id, { startDate: "2026-03-05" });
+    const rootAfterActivation = await db.adventureLog.findUniqueOrThrow({ where: { id: quest.rootAdventureLogId! } });
+    const locationAfterActivation = await db.mapLocation.findUniqueOrThrow({ where: { id: locationId } });
+
+    expect(rootAfterActivation.locationId).toBe(locationId);
+    expect(locationAfterActivation.eventDate.toISOString()).toBe("2026-03-05T12:00:00.000Z");
+    expect(locationAfterActivation.title).toBe(locationBefore.title);
+    expect(locationAfterActivation.description).toBe(locationBefore.description);
+    expect(locationAfterActivation.locationType).toBe(locationBefore.locationType);
+    expect(locationAfterActivation.positionX).toBe(locationBefore.positionX);
+    expect(locationAfterActivation.positionY).toBe(locationBefore.positionY);
+    expect(await db.mapLocation.count({ where: { logs: { some: { id: rootAfterActivation.id } } } })).toBe(1);
+    expect(await db.mapEdge.count({ where: { OR: [{ sourceId: locationId }, { targetId: locationId }] } })).toBe(0);
+
+    const completed = await completeMainQuest(quest.id, "2026-04-01");
+    const completedRoot = await db.adventureLog.findUniqueOrThrow({ where: { id: quest.rootAdventureLogId! } });
+    expect(completedRoot.locationId).toBe(locationId);
+    expect(await db.mapLocation.count({ where: { id: locationId } })).toBe(1);
+    expect(completed.event.locationId).toBeNull();
+  });
+
+  it("rejects activation when the category already has an active Main Quest", async () => {
+    const category = await createCategory("activation conflict category");
+    await createMainQuest({ categoryId: category.id, title: `${marker} activation blocker`, progressType: "COUNT", status: "ACTIVE" });
+    const draft = await createMainQuest({ categoryId: category.id, title: `${marker} blocked draft`, progressType: "COUNT", status: "DRAFT" });
+    const originalRoot = await db.adventureLog.findUniqueOrThrow({ where: { id: draft.rootAdventureLogId! } });
+
+    await expect(activateMainQuest(draft.id, { startDate: "2026-03-06" })).rejects.toThrow(
+      "This category already has an active Main Quest.",
+    );
+    const unchanged = await db.mainQuest.findUniqueOrThrow({ where: { id: draft.id } });
+    const unchangedRoot = await db.adventureLog.findUniqueOrThrow({ where: { id: draft.rootAdventureLogId! } });
+    expect(unchanged.status).toBe("DRAFT");
+    expect(unchanged.startDate).toBeNull();
+    expect(unchangedRoot.startDate).toEqual(originalRoot.startDate);
+  });
+
+  it("rejects activation for active and completed Main Quests", async () => {
+    await expect(activateMainQuest("missing-main-quest", { startDate: "2026-03-07" })).rejects.toThrow("Main Quest not found.");
+
+    const activeCategory = await createCategory("already active activation category");
+    const active = await createMainQuest({
+      categoryId: activeCategory.id,
+      title: `${marker} already active activation`,
+      progressType: "COUNT",
+      status: "ACTIVE",
+      startDate: "2026-01-01",
+    });
+    await expect(activateMainQuest(active.id, { startDate: "2026-03-07" })).rejects.toThrow(
+      "Only draft Main Quests can be activated.",
+    );
+
+    const completedCategory = await createCategory("completed activation category");
+    const completed = await createMainQuest({
+      categoryId: completedCategory.id,
+      title: `${marker} completed activation`,
+      progressType: "COUNT",
+      status: "ACTIVE",
+      startDate: "2026-01-01",
+    });
+    await completeMainQuest(completed.id, "2026-02-01");
+    await expect(activateMainQuest(completed.id, { startDate: "2026-03-07" })).rejects.toThrow(
+      "Only draft Main Quests can be activated.",
+    );
   });
 
   it("completes the quest, root entry, and completion event atomically", async () => {

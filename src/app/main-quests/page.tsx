@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ActivateMainQuestForm } from "@/components/main-quests/activate-main-quest-form";
 import { CompleteMainQuestButton } from "@/components/main-quests/complete-main-quest-button";
 import { CreateMainQuestForm } from "@/components/main-quests/create-main-quest-form";
 import { MainQuestProgressForm } from "@/components/main-quests/main-quest-progress-form";
@@ -53,6 +54,7 @@ export default async function MainQuestsPage() {
                     <span>{completedDate ? `Completed ${completedDate}` : startDate ? `Started ${startDate}` : "Not started"}</span>
                     {quest.rootAdventureLog ? <Link href={`/adventure-log?search=${encodeURIComponent(quest.rootAdventureLog.title)}#entry-${quest.rootAdventureLog.id}`}>Open Adventure Log root</Link> : <span>Root unavailable</span>}
                   </footer>
+                  {quest.status === "DRAFT" ? <ActivateMainQuestForm id={quest.id} /> : null}
                   {quest.status === "ACTIVE" ? <CompleteMainQuestButton id={quest.id} /> : null}
                 </article>
               );
