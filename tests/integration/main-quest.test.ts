@@ -2,6 +2,7 @@ import "dotenv/config";
 import { afterAll, describe, expect, it } from "vitest";
 import { db } from "../../src/lib/db";
 import { listAdventureLogs } from "../../src/server/queries/adventure-log";
+import { listMainQuestOverview } from "../../src/server/queries/main-quest";
 import { createManualJournalEntry } from "../../src/server/services/adventure-log";
 import { activateMainQuest, completeMainQuest, createMainQuest, updateMainQuestProgress } from "../../src/server/services/main-quest";
 
@@ -331,5 +332,57 @@ describe("Main Quest backend foundation", () => {
 
     await expect(updateMainQuestProgress(quest.id, { currentValue: 1 })).rejects.toThrow("Main Quest not found.");
     expect((await db.mainQuest.findUniqueOrThrow({ where: { id: quest.id } })).currentValue).toBe(0);
+  });
+
+  it("separates active, draft, and completed quests in the overview", async () => {
+    const activeCategory = await createCategory("overview active category");
+    const draftCategory = await createCategory("overview draft category");
+    const completedCategory = await createCategory("overview completed category");
+    const active = await createMainQuest({ categoryId: activeCategory.id, title: `${marker} overview active`, progressType: "COUNT", status: "ACTIVE", startDate: "2026-06-01" });
+    const draft = await createMainQuest({ categoryId: draftCategory.id, title: `${marker} overview draft`, progressType: "COUNT" });
+    const completed = await createMainQuest({ categoryId: completedCategory.id, title: `${marker} overview completed`, progressType: "COUNT", status: "ACTIVE", startDate: "2026-06-01" });
+    await completeMainQuest(completed.id, "2026-06-20");
+
+    const overview = await listMainQuestOverview();
+
+    expect(overview.activeCampaigns.some((quest) => quest.id === active.id)).toBe(true);
+    expect(overview.draftQuests.some((quest) => quest.id === draft.id)).toBe(true);
+    expect(overview.completedQuests.some((quest) => quest.id === completed.id)).toBe(true);
+  });
+
+  it("includes root context and the three most recent non-deleted child notes predictably", async () => {
+    const category = await createCategory("overview journey category");
+    const quest = await createMainQuest({ categoryId: category.id, title: `${marker} overview journey`, progressType: "COUNT", status: "ACTIVE" });
+    const older = await createManualJournalEntry({ title: `${marker} overview older`, startDate: "2026-01-02", parentId: quest.rootAdventureLogId! }, []);
+    const deleted = await createManualJournalEntry({ title: `${marker} overview deleted`, startDate: "2026-01-05", parentId: quest.rootAdventureLogId! }, []);
+    const newest = await createManualJournalEntry({ title: `${marker} overview newest`, startDate: "2026-01-04", parentId: quest.rootAdventureLogId! }, []);
+    const middle = await createManualJournalEntry({ title: `${marker} overview middle`, startDate: "2026-01-03", parentId: quest.rootAdventureLogId! }, []);
+    await db.adventureLog.update({ where: { id: deleted.id }, data: { deletedAt: new Date() } });
+
+    const overview = await listMainQuestOverview();
+    const campaign = overview.activeCampaigns.find((item) => item.id === quest.id)!;
+
+    expect(campaign.category.id).toBe(category.id);
+    expect(campaign.rootAdventureLog?.id).toBe(quest.rootAdventureLogId);
+    expect(campaign.rootAdventureLog?.children.map((entry) => entry.id)).toEqual([newest.id, middle.id, older.id]);
+    expect(campaign.rootAdventureLog?.children.some((entry) => entry.id === deleted.id)).toBe(false);
+  });
+
+  it("loads the overview without mutating quest or journey records", async () => {
+    const category = await createCategory("overview read only category");
+    const quest = await createMainQuest({ categoryId: category.id, title: `${marker} overview read only`, progressType: "COUNT", status: "ACTIVE" });
+    const before = await db.mainQuest.findUniqueOrThrow({ where: { id: quest.id } });
+    const countsBefore = {
+      quests: await db.mainQuest.count(),
+      logs: await db.adventureLog.count(),
+      locations: await db.mapLocation.count(),
+    };
+
+    await listMainQuestOverview();
+
+    expect(await db.mainQuest.findUniqueOrThrow({ where: { id: quest.id } })).toEqual(before);
+    expect(await db.mainQuest.count()).toBe(countsBefore.quests);
+    expect(await db.adventureLog.count()).toBe(countsBefore.logs);
+    expect(await db.mapLocation.count()).toBe(countsBefore.locations);
   });
 });

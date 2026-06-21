@@ -1,67 +1,75 @@
 import Link from "next/link";
 import { ActivateMainQuestForm } from "@/components/main-quests/activate-main-quest-form";
-import { CompleteMainQuestButton } from "@/components/main-quests/complete-main-quest-button";
 import { CreateMainQuestForm } from "@/components/main-quests/create-main-quest-form";
-import { MainQuestProgressForm } from "@/components/main-quests/main-quest-progress-form";
+import { CurrentCampaign } from "@/components/main-quests/current-campaign";
 import { GameNav } from "@/components/navigation/game-nav";
 import { db } from "@/lib/db";
+import { listMainQuestOverview } from "@/server/queries/main-quest";
 import { ensureFirstLaunchDefaults } from "@/server/services/bootstrap";
 
 export const dynamic = "force-dynamic";
+
+type OverviewQuest = Awaited<ReturnType<typeof listMainQuestOverview>>["draftQuests"][number];
 
 function displayDate(value: Date | null) {
   return value ? new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "Asia/Taipei" }).format(value) : null;
 }
 
+function rootLink(quest: OverviewQuest) {
+  const root = quest.rootAdventureLog;
+  return root ? `/adventure-log?search=${encodeURIComponent(root.title)}#entry-${root.id}` : "/adventure-log";
+}
+
+function SecondaryQuest({ quest }: { quest: OverviewQuest }) {
+  const completedDate = displayDate(quest.completedDate);
+  return (
+    <article className={`secondary-quest-card ${quest.status.toLowerCase()}`}>
+      <header><span>{quest.category.title}</span><h3>{quest.title}</h3></header>
+      {quest.description ? <p>{quest.description}</p> : null}
+      <footer>
+        <span>{completedDate ? `Completed ${completedDate}` : "Not yet begun"}</span>
+        <Link href={rootLink(quest)}>View journey</Link>
+      </footer>
+      {quest.status === "DRAFT" ? <ActivateMainQuestForm id={quest.id} /> : null}
+    </article>
+  );
+}
+
 export default async function MainQuestsPage() {
   await ensureFirstLaunchDefaults();
-  const categories = await db.mainQuestCategory.findMany({
-    include: {
-      quests: {
-        where: { deletedAt: null },
-        include: { rootAdventureLog: true },
-        orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-      },
-    },
-    orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
-  });
+  const [overview, categories] = await Promise.all([
+    listMainQuestOverview(),
+    db.mainQuestCategory.findMany({ orderBy: [{ sortOrder: "asc" }, { title: "asc" }] }),
+  ]);
 
   return (
     <main className="game-shell main-quest-shell">
-      <header className="main-quest-header">
-        <div><p className="eyebrow">THE LONG ROAD</p><h1>Main Quests</h1><p>Shape long-term goals into campaigns and trace every chapter through the Adventure Log.</p></div>
-      </header>
+      <header className="main-quest-header"><div><p className="eyebrow">THE LONG ROAD</p><h1>Main Quests</h1><p>See the directions shaping your life and the journey already unfolding behind you.</p></div></header>
       <GameNav active="quests" />
 
-      <CreateMainQuestForm categories={categories.map(({ id, title }) => ({ id, title }))} />
+      <section className="campaign-section" aria-labelledby="campaign-title">
+        <div className="quest-section-heading"><div><p className="eyebrow">WHERE YOU ARE HEADING</p><h2 id="campaign-title">{overview.activeCampaigns.length === 1 ? "Current Campaign" : "Current Campaigns"}</h2></div><p>These are the life directions you are actively choosing to move toward.</p></div>
+        <div className="campaign-list">
+          {overview.activeCampaigns.length ? overview.activeCampaigns.map((campaign) => <CurrentCampaign campaign={campaign} key={campaign.id} />) : (
+            <div className="campaign-empty pixel-panel"><h3>No current campaign</h3><p>Choose a possible road below, or chart a new direction when one matters enough to begin.</p></div>
+          )}
+        </div>
+      </section>
 
-      <div className="quest-category-grid">
-        {categories.map((category) => (
-          <section className="quest-category pixel-panel" key={category.id}>
-            <header><h2>{category.title}</h2><span>{category.quests.length} {category.quests.length === 1 ? "quest" : "quests"}</span></header>
-            {category.quests.length ? category.quests.map((quest) => {
-              const progress = Math.min(100, Math.max(0, (quest.currentValue / Math.max(1, quest.targetValue)) * 100));
-              const startDate = displayDate(quest.startDate);
-              const completedDate = displayDate(quest.completedDate);
-              return (
-                <article className="main-quest-card" key={quest.id}>
-                  <div className="main-quest-card-heading"><span className={`quest-status ${quest.status.toLowerCase()}`}>{quest.status}</span><h3>{quest.title}</h3></div>
-                  {quest.description ? <p>{quest.description}</p> : null}
-                  <div className="quest-progress-label"><span>Progress</span><strong>{quest.currentValue} / {quest.targetValue} {quest.unit}</strong></div>
-                  <div className="quest-progress"><span style={{ width: `${progress}%` }} /></div>
-                  {quest.status === "ACTIVE" ? <MainQuestProgressForm id={quest.id} currentValue={quest.currentValue} targetValue={quest.targetValue} unit={quest.unit} /> : null}
-                  <footer>
-                    <span>{completedDate ? `Completed ${completedDate}` : startDate ? `Started ${startDate}` : "Not started"}</span>
-                    {quest.rootAdventureLog ? <Link href={`/adventure-log?search=${encodeURIComponent(quest.rootAdventureLog.title)}#entry-${quest.rootAdventureLog.id}`}>Open Adventure Log root</Link> : <span>Root unavailable</span>}
-                  </footer>
-                  {quest.status === "DRAFT" ? <ActivateMainQuestForm id={quest.id} /> : null}
-                  {quest.status === "ACTIVE" ? <CompleteMainQuestButton id={quest.id} /> : null}
-                </article>
-              );
-            }) : <p className="quest-category-empty">No quests in this category yet.</p>}
-          </section>
-        ))}
-      </div>
+      <details className="new-campaign-panel">
+        <summary><span><strong>Chart a new road</strong><small>Create another Main Quest when a direction deserves a lasting journey.</small></span></summary>
+        <CreateMainQuestForm categories={categories.map(({ id, title }) => ({ id, title }))} />
+      </details>
+
+      <section className="secondary-quest-section" aria-labelledby="possible-roads-title">
+        <div className="quest-section-heading"><div><p className="eyebrow">POSSIBLE ROADS</p><h2 id="possible-roads-title">Directions not yet begun</h2></div><p>Keep possibilities nearby without letting them compete with the journey underway.</p></div>
+        <div className="secondary-quest-list">{overview.draftQuests.length ? overview.draftQuests.map((quest) => <SecondaryQuest quest={quest} key={quest.id} />) : <p className="secondary-quest-empty">No unstarted roads are waiting.</p>}</div>
+      </section>
+
+      <section className="secondary-quest-section traveled" aria-labelledby="roads-traveled-title">
+        <div className="quest-section-heading"><div><p className="eyebrow">ROADS TRAVELED</p><h2 id="roads-traveled-title">Journeys already completed</h2></div><p>Return to the paths that show how far you have already come.</p></div>
+        <div className="secondary-quest-list">{overview.completedQuests.length ? overview.completedQuests.map((quest) => <SecondaryQuest quest={quest} key={quest.id} />) : <p className="secondary-quest-empty">Completed journeys will gather here over time.</p>}</div>
+      </section>
     </main>
   );
 }
