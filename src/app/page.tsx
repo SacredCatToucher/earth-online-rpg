@@ -1,12 +1,32 @@
 import { BackupControls } from "@/components/settings/backup-controls";
 import { CharacterSetup } from "@/components/character/character-setup";
 import { GameNav } from "@/components/navigation/game-nav";
-import { WorldMap } from "@/components/map/world-map";
+import { LifeWorldsMap } from "@/components/map/life-worlds-map";
 import { db } from "@/lib/db";
 import { listWorldMap } from "@/server/queries/world-map";
 import { ensureFirstLaunchDefaults } from "@/server/services/bootstrap";
 
 export const dynamic = "force-dynamic";
+
+function serializeLocation(location: Awaited<ReturnType<typeof listWorldMap>>["locations"][number]) {
+  return {
+    id: location.id,
+    title: location.title,
+    description: location.description,
+    eventDate: location.eventDate.toISOString(),
+    positionX: location.positionX,
+    positionY: location.positionY,
+    linkedLog: location.logs[0] ? {
+      id: location.logs[0].id,
+      title: location.logs[0].title,
+      parent: location.logs[0].parent ? {
+        id: location.logs[0].parent.id,
+        title: location.logs[0].parent.title,
+        locationId: location.logs[0].parent.locationId,
+      } : null,
+    } : null,
+  };
+}
 
 export default async function Home() {
   await ensureFirstLaunchDefaults();
@@ -21,19 +41,15 @@ export default async function Home() {
       <GameNav active="map" />
 
       <section className="world-map-shell pixel-panel" aria-labelledby="world-map-title">
-        <header className="world-map-heading"><div><p className="eyebrow">THE DISCOVERED WORLD</p><h2 id="world-map-title">Your adventure so far</h2></div><p>Follow the trail from the first remembered place to the edge of what comes next.</p></header>
-        <WorldMap connections={map.connections} locations={map.locations.map((location) => ({
-          id: location.id,
-          title: location.title,
-          description: location.description,
-          eventDate: location.eventDate.toISOString(),
-          positionX: location.positionX,
-          positionY: location.positionY,
-          linkedLog: location.logs[0] ? {
-            id: location.logs[0].id,
-            title: location.logs[0].title,
-            parent: location.logs[0].parent,
-          } : null,
+        <header className="world-map-heading"><div><p className="eyebrow">YOUR LIFE WORLDS</p><h2 id="world-map-title">Where your journey is unfolding</h2></div><p>Each World holds a direction, the places you have reached, and the road still opening ahead.</p></header>
+        <LifeWorldsMap worlds={map.worlds.map((world) => ({
+          id: world.id,
+          title: world.title,
+          description: world.description,
+          activeDirection: world.activeDirection,
+          latestDiscovery: world.latestDiscovery ? { title: world.latestDiscovery.title, eventDate: world.latestDiscovery.eventDate.toISOString() } : null,
+          locations: world.locations.map(serializeLocation),
+          connections: world.connections,
         }))} />
       </section>
 
