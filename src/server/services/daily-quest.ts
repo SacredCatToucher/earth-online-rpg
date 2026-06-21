@@ -1,5 +1,11 @@
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { DAILY_QUEST_WEEKDAYS, normalizeDailyQuestWeekdays } from "@/lib/daily-quest";
+import {
+  canonicalDailyQuestDate,
+  DAILY_QUEST_WEEKDAYS,
+  isDailyQuestScheduledForDate,
+  normalizeDailyQuestWeekdays,
+} from "@/lib/daily-quest";
 import { db } from "@/lib/db";
 
 const weekdayInput = z.array(z.enum(DAILY_QUEST_WEEKDAYS)).min(1);
@@ -40,4 +46,39 @@ export async function updateDailyQuest(id: string, input: DailyQuestInput) {
       isActive: parsed.isActive,
     },
   });
+}
+
+export async function completeDailyQuestToday(id: string) {
+  const today = new Date();
+  const questDate = canonicalDailyQuestDate(today);
+  const quest = await db.dailyQuest.findUnique({ where: { id } });
+  if (!quest) throw new Error("Daily Quest not found.");
+  if (!quest.isActive) throw new Error("Paused Daily Quests cannot be completed.");
+  if (!isDailyQuestScheduledForDate(quest.daysOfWeek, today)) {
+    throw new Error("Daily Quest is not scheduled for today.");
+  }
+
+  try {
+    return await db.dailyQuestCompletion.create({
+      data: { dailyQuestId: quest.id, questDate, expAwarded: 0 },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new Error("Daily Quest is already completed today.");
+    }
+    throw error;
+  }
+}
+
+export async function undoDailyQuestCompletionToday(id: string) {
+  const quest = await db.dailyQuest.findUnique({ where: { id }, select: { id: true } });
+  if (!quest) throw new Error("Daily Quest not found.");
+
+  const completion = await db.dailyQuestCompletion.findUnique({
+    where: { dailyQuestId_questDate: { dailyQuestId: quest.id, questDate: canonicalDailyQuestDate() } },
+    select: { id: true },
+  });
+  if (!completion) throw new Error("Daily Quest has no completion to undo today.");
+
+  return db.dailyQuestCompletion.delete({ where: { id: completion.id } });
 }

@@ -2,17 +2,36 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { db } from "../../src/lib/db";
+import {
+  canonicalDailyQuestDate,
+  DAILY_QUEST_WEEKDAYS,
+  dailyQuestWeekday,
+  type DailyQuestWeekday,
+} from "../../src/lib/daily-quest";
 import { listDailyQuests } from "../../src/server/queries/daily-quest";
-import { createDailyQuest, updateDailyQuest } from "../../src/server/services/daily-quest";
+import {
+  completeDailyQuestToday,
+  createDailyQuest,
+  undoDailyQuestCompletionToday,
+  updateDailyQuest,
+} from "../../src/server/services/daily-quest";
 
 const marker = `Phase 5 Daily Quest test ${randomUUID()}`;
 
-describe("Daily Quest foundation", () => {
-  afterAll(async () => {
-    await db.dailyQuest.deleteMany({ where: { title: { startsWith: marker } } });
-    await db.$disconnect();
-  });
+function todayWeekdays(): DailyQuestWeekday[] {
+  return [dailyQuestWeekday()];
+}
 
+function anotherWeekday(): DailyQuestWeekday {
+  return DAILY_QUEST_WEEKDAYS.find((day) => day !== dailyQuestWeekday())!;
+}
+
+afterAll(async () => {
+  await db.dailyQuest.deleteMany({ where: { title: { startsWith: marker } } });
+  await db.$disconnect();
+});
+
+describe("Daily Quest foundation", () => {
   it("creates a definition with canonical repeat days and no EXP reward", async () => {
     const quest = await createDailyQuest({
       title: `${marker} canonical cadence`,
@@ -75,5 +94,88 @@ describe("Daily Quest foundation", () => {
     await expect(
       updateDailyQuest("missing-daily-quest", { title: `${marker} missing`, weekdays: ["MON"] }),
     ).rejects.toThrow("Daily Quest not found.");
+  });
+});
+
+describe("Daily Quest completion foundation", () => {
+  it("completes an active quest for today with a canonical date and no EXP", async () => {
+    const quest = await createDailyQuest({ title: `${marker} complete today`, weekdays: todayWeekdays() });
+
+    const completion = await completeDailyQuestToday(quest.id);
+
+    expect(completion.questDate).toBe(canonicalDailyQuestDate());
+    expect(completion.questDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(completion.expAwarded).toBe(0);
+    expect(await db.dailyQuestCompletion.count({ where: { dailyQuestId: quest.id } })).toBe(1);
+    const listed = (await listDailyQuests()).find((item) => item.id === quest.id);
+    expect(listed).toMatchObject({ isScheduledToday: true, isCompletedToday: true });
+  });
+
+  it("rejects duplicate completion without adding another record", async () => {
+    const quest = await createDailyQuest({ title: `${marker} duplicate`, weekdays: todayWeekdays() });
+    await completeDailyQuestToday(quest.id);
+
+    await expect(completeDailyQuestToday(quest.id)).rejects.toThrow("Daily Quest is already completed today.");
+    expect(await db.dailyQuestCompletion.count({ where: { dailyQuestId: quest.id } })).toBe(1);
+  });
+
+  it("rejects completion for paused and unscheduled quests", async () => {
+    const paused = await createDailyQuest({ title: `${marker} paused completion`, weekdays: todayWeekdays(), isActive: false });
+    const unscheduled = await createDailyQuest({ title: `${marker} unscheduled`, weekdays: [anotherWeekday()] });
+
+    await expect(completeDailyQuestToday(paused.id)).rejects.toThrow("Paused Daily Quests cannot be completed.");
+    await expect(completeDailyQuestToday(unscheduled.id)).rejects.toThrow("Daily Quest is not scheduled for today.");
+    expect(await db.dailyQuestCompletion.count({ where: { dailyQuestId: { in: [paused.id, unscheduled.id] } } })).toBe(0);
+  });
+
+  it("undoes only today's completion and clearly rejects a repeated undo", async () => {
+    const quest = await createDailyQuest({ title: `${marker} undo`, weekdays: todayWeekdays() });
+    await completeDailyQuestToday(quest.id);
+
+    const removed = await undoDailyQuestCompletionToday(quest.id);
+
+    expect(removed.questDate).toBe(canonicalDailyQuestDate());
+    expect(await db.dailyQuestCompletion.count({ where: { dailyQuestId: quest.id } })).toBe(0);
+    await expect(undoDailyQuestCompletionToday(quest.id)).rejects.toThrow("Daily Quest has no completion to undo today.");
+  });
+
+  it("allows today's completion to be undone after the quest is paused", async () => {
+    const quest = await createDailyQuest({ title: `${marker} pause after completion`, weekdays: todayWeekdays() });
+    await completeDailyQuestToday(quest.id);
+    await updateDailyQuest(quest.id, {
+      title: quest.title,
+      description: quest.description,
+      weekdays: todayWeekdays(),
+      isActive: false,
+    });
+
+    await expect(undoDailyQuestCompletionToday(quest.id)).resolves.toMatchObject({ dailyQuestId: quest.id });
+  });
+
+  it("creates no journey, map, EXP, reward, achievement, or skill side effects", async () => {
+    const countsBefore = {
+      adventureLogs: await db.adventureLog.count(),
+      mapLocations: await db.mapLocation.count(),
+      expTransactions: await db.expTransaction.count(),
+      rewards: await db.reward.count(),
+      achievements: await db.achievement.count(),
+      skillRecords: await db.skillRecord.count(),
+    };
+    const quest = await createDailyQuest({ title: `${marker} isolated completion`, weekdays: todayWeekdays() });
+
+    await completeDailyQuestToday(quest.id);
+    await undoDailyQuestCompletionToday(quest.id);
+
+    expect(await db.adventureLog.count()).toBe(countsBefore.adventureLogs);
+    expect(await db.mapLocation.count()).toBe(countsBefore.mapLocations);
+    expect(await db.expTransaction.count()).toBe(countsBefore.expTransactions);
+    expect(await db.reward.count()).toBe(countsBefore.rewards);
+    expect(await db.achievement.count()).toBe(countsBefore.achievements);
+    expect(await db.skillRecord.count()).toBe(countsBefore.skillRecords);
+  });
+
+  it("reports a missing quest for completion and undo", async () => {
+    await expect(completeDailyQuestToday("missing-daily-quest")).rejects.toThrow("Daily Quest not found.");
+    await expect(undoDailyQuestCompletionToday("missing-daily-quest")).rejects.toThrow("Daily Quest not found.");
   });
 });

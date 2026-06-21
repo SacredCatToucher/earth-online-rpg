@@ -1,3 +1,5 @@
+import { localDateInputValue } from "@/lib/dates";
+
 export const DAILY_QUEST_WEEKDAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] as const;
 
 export type DailyQuestWeekday = (typeof DAILY_QUEST_WEEKDAYS)[number];
@@ -11,6 +13,20 @@ const weekdayLabels: Record<DailyQuestWeekday, string> = {
   SAT: "Sat",
   SUN: "Sun",
 };
+
+const weekdaysByIndex: DailyQuestWeekday[] = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+export function canonicalDailyQuestDate(date = new Date()) {
+  return localDateInputValue(date);
+}
+
+export function dailyQuestWeekday(date = new Date()) {
+  return weekdaysByIndex[date.getDay()];
+}
+
+export function isDailyQuestScheduledForDate(daysOfWeek: string, date = new Date()) {
+  return parseDailyQuestWeekdays(daysOfWeek).includes(dailyQuestWeekday(date));
+}
 
 export function normalizeDailyQuestWeekdays(days: readonly DailyQuestWeekday[]) {
   const selected = new Set(days);
