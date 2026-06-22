@@ -273,36 +273,38 @@ Define future acceptance checks for Testing Tools v1. These controls are not imp
 
 ### Manual Actions (Future Only)
 
-When **Clear All Test Data** and **Rebuild Demo Data** are implemented:
+When **Clear All Data** and **Reset Demo Data** are implemented:
 
 1. Back up any data that must be preserved and open the future Testing Tools UI.
-2. Select **Clear All Test Data**.
-3. Cancel the confirmation once and verify nothing changes.
-4. Repeat the action and confirm it.
-5. Visit every core page and inspect its empty state.
-6. Reload the application and confirm cleared test data does not return.
-7. Select **Rebuild Demo Data**.
-8. Cancel the confirmation once and verify no demo records are created.
-9. Repeat the action and confirm it.
-10. Verify the generated data includes:
+2. Confirm **Clear All Data** and **Reset Demo Data** are visible only in a clearly labeled developer/testing area.
+3. Select **Clear All Data**.
+4. Cancel the confirmation once and verify nothing changes.
+5. Repeat the action and confirm it.
+6. Visit every core page and inspect its empty state.
+7. Reload the application and confirm cleared test data does not return.
+8. Select **Reset Demo Data**.
+9. Cancel the confirmation once and verify no demo records are created.
+10. Repeat the action and confirm it.
+11. Verify the generated data includes:
     - 1 Active Main Quest
     - At least 2 phase-like child events
     - At least 1 Completed phase-like event
     - At least 1 Active/Ongoing phase-like event
     - At least 1 Daily Quest
+    - At least 1 Adventure Log event
     - Visible World Map and Life Worlds content
     - A visible Main Quest -> phase/event -> map relationship
-11. Follow the generated Main Quest into its Adventure Log tree and corresponding World.
-12. Run **Rebuild Demo Data** again and confirm the result does not grow through unlimited duplication.
-13. Reload every core page and confirm the rebuilt data persists and remains internally linked.
+12. Follow the generated Main Quest into its Adventure Log tree and corresponding World.
+13. Run **Reset Demo Data** again and confirm the result does not grow through unlimited duplication.
+14. Reload every core page and confirm the reset data persists and remains internally linked.
 
 ### Expected Results (Future Only)
 
 - Both destructive/rebuilding operations require explicit confirmation.
 - Canceling either confirmation performs no mutation.
 - Clear removes the intended test data and leaves stable empty states.
-- Rebuild creates a coherent, reviewable demo journey with the required coverage.
-- Repeated rebuild is idempotent or replaces a known demo data set instead of duplicating it indefinitely.
+- Reset creates a coherent, reviewable demo journey with the required coverage.
+- Repeated reset is idempotent or replaces a known demo data set instead of duplicating it indefinitely.
 - Main Quest, event tree, Daily Quest, Adventure Log, and World Map references remain consistent.
 
 ### Regression Notes
