@@ -332,8 +332,36 @@ Default rules:
 7. Check `git status` before and after important steps.
 
 ---
+## 10. GitHub Connector Permission Rule
 
-## 10. Simple Rule
+ChatGPT may read the repository when it is useful for analysis, planning, QA review, or task generation.
+
+ChatGPT must not write to the repository unless the user explicitly approves the action.
+
+Write actions include:
+
+1. Creating or updating files
+2. Creating, updating, or closing issues
+3. Creating, updating, or merging pull requests
+4. Adding comments or labels
+5. Pushing changes
+6. Merging branches
+7. Deleting files or branches
+
+Before any write action, ChatGPT should clearly state:
+
+1. What will be changed
+2. Which repository and branch will be affected
+3. Whether the action creates a commit, issue, comment, PR, push, or merge
+
+The user must explicitly confirm before the write action is performed.
+
+Default rule:
+
+Read is allowed when relevant. Write, push, merge, and publish actions require explicit user approval.
+
+---
+## 11. Simple Rule
 
 If unsure what to do next, follow this order:
 
