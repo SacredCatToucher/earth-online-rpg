@@ -10,6 +10,7 @@ type WorldLocation = {
   eventDate: string;
   positionX: number;
   positionY: number;
+  isMainQuestRoot: boolean;
   linkedLog: {
     id: string;
     title: string;
@@ -37,6 +38,44 @@ function routePath(source: StagePosition, target: StagePosition) {
   return `M ${source.x} ${source.y} C ${midpoint} ${source.y}, ${midpoint} ${target.y}, ${target.x} ${target.y}`;
 }
 
+function backbonePosition(index: number, count: number): StagePosition {
+  if (count === 1) return { x: 22, y: 28 };
+  return { x: 12 + index * (70 / (count - 1)), y: 28 };
+}
+
+function branchPositions(
+  roots: WorldLocation[],
+  connections: WorldConnection[],
+  positionsById: Map<string, StagePosition>,
+) {
+  const childrenByParent = new Map<string, string[]>();
+  for (const connection of connections.filter((item) => item.kind === "EVENT_TREE")) {
+    const children = childrenByParent.get(connection.sourceId) ?? [];
+    children.push(connection.targetId);
+    childrenByParent.set(connection.sourceId, children);
+  }
+
+  function placeChildren(parentId: string, depth: number, visited: Set<string>) {
+    const parent = positionsById.get(parentId);
+    const children = childrenByParent.get(parentId) ?? [];
+    if (!parent) return;
+    children.forEach((childId, index) => {
+      if (visited.has(childId)) return;
+      visited.add(childId);
+      const siblingOffset = (index - (children.length - 1) / 2) * 10;
+      positionsById.set(childId, {
+        x: Math.max(8, Math.min(92, parent.x + siblingOffset + (depth % 2 === 0 ? 4 : 0))),
+        y: Math.min(88, 28 + depth * 15),
+      });
+      placeChildren(childId, depth + 1, visited);
+    });
+  }
+
+  const visited = new Set(roots.map((root) => root.id));
+  roots.forEach((root) => placeChildren(root.id, 1, visited));
+  return visited;
+}
+
 function displayDate(value: string) {
   return new Intl.DateTimeFormat("en", { dateStyle: "long", timeZone: "Asia/Taipei" }).format(new Date(value));
 }
@@ -44,11 +83,32 @@ function displayDate(value: string) {
 export function WorldMap({ locations, connections }: { locations: WorldLocation[]; connections: WorldConnection[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = locations.find((location) => location.id === selectedId) ?? null;
+  const mainRoadLocations = locations.filter((location) => location.isMainQuestRoot);
+  const hasMainRoad = mainRoadLocations.length > 0;
+  const eventTreeConnections = connections.filter((connection) => connection.kind === "EVENT_TREE");
+  const branchTargetIds = new Set(eventTreeConnections.map((connection) => connection.targetId));
+  const fallbackBackboneLocations = hasMainRoad ? [] : locations.filter((location) => !branchTargetIds.has(location.id));
+  const hasBranchAwareFallback = !hasMainRoad && eventTreeConnections.length > 0 && fallbackBackboneLocations.length > 0;
+  const usesBranchLayout = hasMainRoad || hasBranchAwareFallback;
+  const backboneLocations = hasMainRoad ? mainRoadLocations : fallbackBackboneLocations;
   const stageCount = locations.length ? locations.length + 1 : 1;
-  const positions = locations.map((_, index) => stagePosition(index, stageCount));
-  const positionsById = new Map(locations.map((location, index) => [location.id, positions[index]]));
-  const unchartedPosition = stagePosition(locations.length, stageCount);
-  const rowCount = Math.max(1, Math.ceil(stageCount / stagesPerRow));
+  const fallbackPositions = locations.map((_, index) => stagePosition(index, stageCount));
+  const positionsById = new Map<string, StagePosition>();
+  let branchLocationIds = new Set<string>();
+  if (usesBranchLayout) {
+    backboneLocations.forEach((location, index) => positionsById.set(location.id, backbonePosition(index, backboneLocations.length)));
+    const placedIds = branchPositions(backboneLocations, connections, positionsById);
+    const backboneIds = new Set(backboneLocations.map((location) => location.id));
+    branchLocationIds = new Set([...placedIds].filter((id) => !backboneIds.has(id)));
+    const unplaced = locations.filter((location) => !placedIds.has(location.id));
+    unplaced.forEach((location, index) => positionsById.set(location.id, { x: 12 + index * (76 / Math.max(1, unplaced.length - 1)), y: 88 }));
+  } else {
+    locations.forEach((location, index) => positionsById.set(location.id, fallbackPositions[index]));
+  }
+  const positions = locations.map((location) => positionsById.get(location.id)!);
+  const lastBackbonePosition = usesBranchLayout ? positionsById.get(backboneLocations[backboneLocations.length - 1].id)! : null;
+  const unchartedPosition = lastBackbonePosition ? { x: Math.min(94, lastBackbonePosition.x + 12), y: lastBackbonePosition.y } : stagePosition(locations.length, stageCount);
+  const rowCount = usesBranchLayout ? 4 : Math.max(1, Math.ceil(stageCount / stagesPerRow));
 
   return (
     <>
@@ -59,9 +119,13 @@ export function WorldMap({ locations, connections }: { locations: WorldLocation[
 
         {locations.length ? (
           <svg className="journey-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            {positions.slice(1).map((position, index) => <path className="traveled-route" d={routePath(positions[index], position)} key={`trail-${index}`} />)}
-            <path className="uncharted-route" d={routePath(positions[positions.length - 1], unchartedPosition)} />
-            {connections.filter((connection) => connection.kind === "EVENT_TREE").map((connection) => {
+            {(usesBranchLayout ? connections.filter((connection) => connection.kind === "CHRONOLOGICAL") : positions.slice(1).map((_, index) => ({ sourceId: locations[index].id, targetId: locations[index + 1].id, kind: "CHRONOLOGICAL" as const }))).map((connection) => {
+              const source = positionsById.get(connection.sourceId);
+              const target = positionsById.get(connection.targetId);
+              return source && target ? <path className="traveled-route main-road-route" d={routePath(source, target)} key={`road-${connection.sourceId}-${connection.targetId}`} /> : null;
+            })}
+            <path className="uncharted-route" d={routePath(lastBackbonePosition ?? positions[positions.length - 1], unchartedPosition)} />
+            {eventTreeConnections.map((connection) => {
               const source = positionsById.get(connection.sourceId);
               const target = positionsById.get(connection.targetId);
               return source && target ? <path className="branch-route" d={routePath(source, target)} key={`${connection.sourceId}-${connection.targetId}`} /> : null;
@@ -72,9 +136,10 @@ export function WorldMap({ locations, connections }: { locations: WorldLocation[
         {locations.map((location, index) => {
           const position = positions[index];
           const isFrontier = index === locations.length - 1;
+          const isBranch = branchLocationIds.has(location.id);
           return (
             <button
-              className={`journey-stage ${isFrontier ? "frontier" : "traveled"} ${selectedId === location.id ? "selected" : ""}`}
+              className={`journey-stage ${location.isMainQuestRoot ? "main-road-stage" : ""} ${isBranch ? "branch-stage" : ""} ${isFrontier ? "frontier" : "traveled"} ${selectedId === location.id ? "selected" : ""}`}
               style={{ left: `${position.x}%`, top: `${position.y}%` }}
               type="button"
               key={location.id}
@@ -83,7 +148,7 @@ export function WorldMap({ locations, connections }: { locations: WorldLocation[
             >
               <span className="stage-marker"><span>{index + 1}</span></span>
               <strong>{location.title}</strong>
-              {isFrontier ? <small>Frontier</small> : null}
+              {isBranch ? <small>{isFrontier ? "Related frontier" : "Related milestone"}</small> : isFrontier ? <small>Frontier</small> : null}
             </button>
           );
         })}
@@ -99,7 +164,7 @@ export function WorldMap({ locations, connections }: { locations: WorldLocation[
         )}
       </div>
 
-      <div className="map-legend" aria-label="Map legend"><span><i className="traveled" />Traveled milestone</span><span><i className="frontier" />Latest discovery</span><span><i className="uncharted" />Uncharted road</span></div>
+      <div className="map-legend" aria-label="Map legend"><span><i className="traveled" />{hasMainRoad ? "Main road" : hasBranchAwareFallback ? "Journey path" : "Traveled milestone"}</span>{usesBranchLayout ? <span><i className="branch" />Related milestone</span> : null}<span><i className="frontier" />Latest discovery</span><span><i className="uncharted" />Uncharted road</span></div>
 
       {selected ? (
         <aside className="map-story-panel" aria-live="polite">

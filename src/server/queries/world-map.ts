@@ -10,12 +10,38 @@ export const WIDER_JOURNEY_WORLD_ID = "wider-journey";
 
 type ConnectionLocation = {
   id: string;
+  isMainQuestRoot: boolean;
   logs: Array<{ parent: { locationId: string | null } | null }>;
 };
 
-function buildConnections(locations: readonly ConnectionLocation[]) {
+function buildConnections(locations: readonly ConnectionLocation[], useBranchAwarePath = false) {
   const locationIds = new Set(locations.map((location) => location.id));
   const connections: WorldMapConnection[] = [];
+  const mainRoadLocations = locations.filter((location) => location.isMainQuestRoot);
+
+  if (useBranchAwarePath) {
+    const backboneLocations = mainRoadLocations.length
+      ? mainRoadLocations
+      : locations.filter((location) => {
+          const parentLocationId = location.logs[0]?.parent?.locationId;
+          return !parentLocationId || parentLocationId === location.id || !locationIds.has(parentLocationId);
+        });
+    for (let index = 1; index < backboneLocations.length; index++) {
+      connections.push({
+        sourceId: backboneLocations[index - 1].id,
+        targetId: backboneLocations[index].id,
+        kind: "CHRONOLOGICAL",
+      });
+    }
+    for (const location of locations) {
+      const parentLocationId = location.logs[0]?.parent?.locationId;
+      if (parentLocationId && parentLocationId !== location.id && locationIds.has(parentLocationId)) {
+        connections.push({ sourceId: parentLocationId, targetId: location.id, kind: "EVENT_TREE" });
+      }
+    }
+    return connections;
+  }
+
   for (const [index, location] of locations.entries()) {
     const parentLocationId = location.logs[0]?.parent?.locationId;
     if (parentLocationId && parentLocationId !== location.id && locationIds.has(parentLocationId)) {
@@ -37,6 +63,7 @@ export async function listWorldMap() {
           select: {
             id: true,
             title: true,
+            rootForQuest: { select: { id: true } },
             parent: {
               select: {
                 id: true,
@@ -84,10 +111,14 @@ export async function listWorldMap() {
     }),
   ]);
 
-  const connections = buildConnections(locations);
+  const mapLocations = locations.map((location) => ({
+    ...location,
+    isMainQuestRoot: Boolean(location.logs[0]?.rootForQuest),
+  }));
+  const connections = buildConnections(mapLocations);
 
   const categoryWorlds = categories.map((category) => {
-    const worldLocations = locations.filter((location) => {
+    const worldLocations = mapLocations.filter((location) => {
       const log = location.logs[0];
       const quest = log?.mainQuest ?? log?.parent?.mainQuest;
       return quest && !quest.deletedAt && quest.category.id === category.id;
@@ -101,12 +132,12 @@ export async function listWorldMap() {
       activeDirection: activeDirection ? { id: activeDirection.id, title: activeDirection.title } : null,
       latestDiscovery: worldLocations.length ? worldLocations[worldLocations.length - 1] : null,
       locations: worldLocations,
-      connections: buildConnections(worldLocations),
+      connections: buildConnections(worldLocations, true),
     };
   }).filter((world) => world.locations.length > 0 || world.activeDirection);
 
   const categorizedLocationIds = new Set(categoryWorlds.flatMap((world) => world.locations.map((location) => location.id)));
-  const widerJourneyLocations = locations.filter((location) => !categorizedLocationIds.has(location.id));
+  const widerJourneyLocations = mapLocations.filter((location) => !categorizedLocationIds.has(location.id));
   const worlds = [...categoryWorlds];
   if (widerJourneyLocations.length) {
     worlds.push({
@@ -116,9 +147,9 @@ export async function listWorldMap() {
       activeDirection: null,
       latestDiscovery: widerJourneyLocations[widerJourneyLocations.length - 1],
       locations: widerJourneyLocations,
-      connections: buildConnections(widerJourneyLocations),
+      connections: buildConnections(widerJourneyLocations, true),
     });
   }
 
-  return { locations, connections, worlds };
+  return { locations: mapLocations, connections, worlds };
 }

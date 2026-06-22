@@ -16,6 +16,7 @@ function serializeLocation(location: Awaited<ReturnType<typeof listWorldMap>>["l
     eventDate: location.eventDate.toISOString(),
     positionX: location.positionX,
     positionY: location.positionY,
+    isMainQuestRoot: location.isMainQuestRoot,
     linkedLog: location.logs[0] ? {
       id: location.logs[0].id,
       title: location.logs[0].title,

@@ -11,6 +11,7 @@ type WorldLocation = {
   eventDate: string;
   positionX: number;
   positionY: number;
+  isMainQuestRoot: boolean;
   linkedLog: {
     id: string;
     title: string;

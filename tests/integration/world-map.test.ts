@@ -36,16 +36,26 @@ describe("World Map event tree connections", () => {
     const childLocation = map.locations.find((location) => location.id === child.locationId);
     const standaloneIndex = map.locations.findIndex((location) => location.id === standalone.locationId);
     const chronologicalPredecessor = map.locations[standaloneIndex - 1];
+    const widerJourney = map.worlds.find((world) => world.id === WIDER_JOURNEY_WORLD_ID);
 
     expect(map.connections).toContainEqual({ sourceId: parent.locationId, targetId: child.locationId, kind: "EVENT_TREE" });
     expect(standaloneIndex).toBeGreaterThan(0);
     expect(map.connections).toContainEqual({ sourceId: chronologicalPredecessor.id, targetId: standalone.locationId, kind: "CHRONOLOGICAL" });
     expect(childLocation?.logs[0]?.parent).toMatchObject({ id: parent.id, title: parent.title, locationId: parent.locationId });
-    expect(map.worlds.find((world) => world.id === WIDER_JOURNEY_WORLD_ID)?.connections).toContainEqual({
+    expect(widerJourney?.connections).toContainEqual({
       sourceId: parent.locationId,
       targetId: child.locationId,
       kind: "EVENT_TREE",
     });
+    expect(widerJourney?.connections).toContainEqual({
+      sourceId: parent.locationId,
+      targetId: standalone.locationId,
+      kind: "CHRONOLOGICAL",
+    });
+    expect(widerJourney?.connections.some((connection) => (
+      connection.kind === "CHRONOLOGICAL"
+      && (connection.sourceId === child.locationId || connection.targetId === child.locationId)
+    ))).toBe(false);
   });
 
   it("groups verified quest milestones into Life Worlds and keeps unmatched milestones in Wider Journey without mutations", async () => {
@@ -83,6 +93,10 @@ describe("World Map event tree connections", () => {
       { title: `${marker} inherited child milestone`, startDate: "2026-01-04", parentId: quest.rootAdventureLogId!, isMilestone: true },
       [],
     );
+    const nestedMappedChild = await createManualJournalEntry(
+      { title: `${marker} nested child milestone`, startDate: "2026-01-05", parentId: mappedChild.id, isMilestone: true },
+      [],
+    );
     await createMainQuest({
       categoryId: directionOnlyCategory.id,
       title: `${marker} direction without milestone`,
@@ -113,6 +127,8 @@ describe("World Map event tree connections", () => {
     expect(categoryWorld?.activeDirection).toEqual({ id: quest.id, title: quest.title });
     expect(categoryWorld?.locations.some((location) => location.id === quest.rootAdventureLog?.locationId)).toBe(true);
     expect(categoryWorld?.locations.some((location) => location.id === mappedChild.locationId)).toBe(true);
+    expect(categoryWorld?.locations.find((location) => location.id === quest.rootAdventureLog?.locationId)?.isMainQuestRoot).toBe(true);
+    expect(categoryWorld?.locations.find((location) => location.id === mappedChild.locationId)?.isMainQuestRoot).toBe(false);
     expect(map.locations.find((location) => location.id === mappedChild.locationId)?.logs[0]?.mainQuest?.category.id).toBe(category.id);
     expect(categoryWorld?.connections).toContainEqual({
       sourceId: quest.rootAdventureLog?.locationId,
@@ -124,11 +140,21 @@ describe("World Map event tree connections", () => {
       targetId: mappedChild.locationId,
       kind: "EVENT_TREE",
     });
+    expect(categoryWorld?.connections).toContainEqual({
+      sourceId: mappedChild.locationId,
+      targetId: nestedMappedChild.locationId,
+      kind: "EVENT_TREE",
+    });
+    expect(categoryWorld?.connections.some((connection) => (
+      connection.kind === "CHRONOLOGICAL"
+      && (connection.sourceId === mappedChild.locationId || connection.targetId === mappedChild.locationId)
+    ))).toBe(false);
     expect(categoryWorld?.connections.some((connection) => connection.sourceId === interleavingQuest.rootAdventureLog?.locationId)).toBe(false);
     expect(directionOnlyWorld?.locations).toEqual([]);
     expect(map.worlds.some((world) => world.id === draftOnlyCategory.id)).toBe(false);
     expect(map.worlds.some((world) => world.id === emptyCategory.id)).toBe(false);
     expect(widerJourney?.locations.some((location) => location.id === standalone.locationId)).toBe(true);
+    expect(widerJourney?.connections.some((connection) => connection.kind === "CHRONOLOGICAL")).toBe(true);
     expect(await db.mainQuest.count()).toBe(countsBefore.quests);
     expect(await db.adventureLog.count()).toBe(countsBefore.logs);
     expect(await db.mapLocation.count()).toBe(countsBefore.locations);
