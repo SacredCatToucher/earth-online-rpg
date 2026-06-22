@@ -22,15 +22,21 @@ type WorldConnection = { sourceId: string; targetId: string; kind: "EVENT_TREE" 
 type StagePosition = { x: number; y: number };
 
 const stagesPerRow = 4;
-const stageColumns = [15, 38.5, 61.5, 85];
+const fallbackCanvasWidth = 900;
+const stageColumns = [135, 345, 555, 765];
 
 function stagePosition(index: number, stageCount: number): StagePosition {
   const row = Math.floor(index / stagesPerRow);
   const column = index % stagesPerRow;
   const rows = Math.max(1, Math.ceil(stageCount / stagesPerRow));
   const x = row % 2 === 0 ? stageColumns[column] : stageColumns[stagesPerRow - 1 - column];
-  const y = rows === 1 ? 50 : 12 + row * (76 / (rows - 1));
+  const y = rows === 1 ? 280 : 120 + row * 180;
   return { x, y };
+}
+
+function fallbackCanvasHeight(stageCount: number) {
+  const rows = Math.max(1, Math.ceil(stageCount / stagesPerRow));
+  return Math.max(560, 240 + (rows - 1) * 180);
 }
 
 function routePath(source: StagePosition, target: StagePosition) {
@@ -38,9 +44,8 @@ function routePath(source: StagePosition, target: StagePosition) {
   return `M ${source.x} ${source.y} C ${midpoint} ${source.y}, ${midpoint} ${target.y}, ${target.x} ${target.y}`;
 }
 
-function backbonePosition(index: number, count: number): StagePosition {
-  if (count === 1) return { x: 22, y: 28 };
-  return { x: 12 + index * (70 / (count - 1)), y: 28 };
+function backbonePosition(index: number): StagePosition {
+  return { x: 140 + index * 220, y: 140 };
 }
 
 function branchPositions(
@@ -62,10 +67,10 @@ function branchPositions(
     children.forEach((childId, index) => {
       if (visited.has(childId)) return;
       visited.add(childId);
-      const siblingOffset = (index - (children.length - 1) / 2) * 10;
+      const siblingOffset = (index - (children.length - 1) / 2) * 100;
       positionsById.set(childId, {
-        x: Math.max(8, Math.min(92, parent.x + siblingOffset + (depth % 2 === 0 ? 4 : 0))),
-        y: Math.min(88, 28 + depth * 15),
+        x: Math.max(80, parent.x + siblingOffset + (depth % 2 === 0 ? 40 : 0)),
+        y: 140 + depth * 140,
       });
       placeChildren(childId, depth + 1, visited);
     });
@@ -96,72 +101,80 @@ export function WorldMap({ locations, connections }: { locations: WorldLocation[
   const positionsById = new Map<string, StagePosition>();
   let branchLocationIds = new Set<string>();
   if (usesBranchLayout) {
-    backboneLocations.forEach((location, index) => positionsById.set(location.id, backbonePosition(index, backboneLocations.length)));
+    backboneLocations.forEach((location, index) => positionsById.set(location.id, backbonePosition(index)));
     const placedIds = branchPositions(backboneLocations, connections, positionsById);
     const backboneIds = new Set(backboneLocations.map((location) => location.id));
     branchLocationIds = new Set([...placedIds].filter((id) => !backboneIds.has(id)));
     const unplaced = locations.filter((location) => !placedIds.has(location.id));
-    unplaced.forEach((location, index) => positionsById.set(location.id, { x: 12 + index * (76 / Math.max(1, unplaced.length - 1)), y: 88 }));
+    const branchBottom = Math.max(350, ...[...positionsById.values()].map((position) => position.y));
+    unplaced.forEach((location, index) => positionsById.set(location.id, { x: 140 + index * 180, y: branchBottom + 150 }));
   } else {
     locations.forEach((location, index) => positionsById.set(location.id, fallbackPositions[index]));
   }
   const positions = locations.map((location) => positionsById.get(location.id)!);
   const lastBackbonePosition = usesBranchLayout ? positionsById.get(backboneLocations[backboneLocations.length - 1].id)! : null;
-  const unchartedPosition = lastBackbonePosition ? { x: Math.min(94, lastBackbonePosition.x + 12), y: lastBackbonePosition.y } : stagePosition(locations.length, stageCount);
-  const rowCount = usesBranchLayout ? 4 : Math.max(1, Math.ceil(stageCount / stagesPerRow));
+  const unchartedPosition = lastBackbonePosition ? { x: lastBackbonePosition.x + 170, y: lastBackbonePosition.y } : stagePosition(locations.length, stageCount);
+  const mapWidth = usesBranchLayout
+    ? Math.max(fallbackCanvasWidth, unchartedPosition.x + 140, ...positions.map((position) => position.x + 140))
+    : fallbackCanvasWidth;
+  const mapHeight = usesBranchLayout
+    ? Math.max(560, ...positions.map((position) => position.y + 150))
+    : fallbackCanvasHeight(stageCount);
 
   return (
     <>
-      <div className="journey-map-board" style={{ minHeight: `${Math.max(560, rowCount * 155)}px` }} aria-label="World Map of life milestones">
-        <div className="terrain-region terrain-west" aria-hidden="true" />
-        <div className="terrain-region terrain-east" aria-hidden="true" />
-        <div className="terrain-region terrain-south" aria-hidden="true" />
+      <div className="map-scroll-viewport journey-map-viewport">
+        <div className="journey-map-board" style={{ width: `${mapWidth}px`, height: `${mapHeight}px`, minWidth: "100%", minHeight: "100%" }} aria-label="World Map of life milestones">
+          <div className="terrain-region terrain-west" aria-hidden="true" />
+          <div className="terrain-region terrain-east" aria-hidden="true" />
+          <div className="terrain-region terrain-south" aria-hidden="true" />
 
-        {locations.length ? (
-          <svg className="journey-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            {(usesBranchLayout ? connections.filter((connection) => connection.kind === "CHRONOLOGICAL") : positions.slice(1).map((_, index) => ({ sourceId: locations[index].id, targetId: locations[index + 1].id, kind: "CHRONOLOGICAL" as const }))).map((connection) => {
-              const source = positionsById.get(connection.sourceId);
-              const target = positionsById.get(connection.targetId);
-              return source && target ? <path className="traveled-route main-road-route" d={routePath(source, target)} key={`road-${connection.sourceId}-${connection.targetId}`} /> : null;
-            })}
-            <path className="uncharted-route" d={routePath(lastBackbonePosition ?? positions[positions.length - 1], unchartedPosition)} />
-            {eventTreeConnections.map((connection) => {
-              const source = positionsById.get(connection.sourceId);
-              const target = positionsById.get(connection.targetId);
-              return source && target ? <path className="branch-route" d={routePath(source, target)} key={`${connection.sourceId}-${connection.targetId}`} /> : null;
-            })}
-          </svg>
-        ) : null}
+          {locations.length ? (
+            <svg className="journey-routes" style={{ width: `${mapWidth}px`, height: `${mapHeight}px` }} viewBox={`0 0 ${mapWidth} ${mapHeight}`} preserveAspectRatio="none" aria-hidden="true">
+              {(usesBranchLayout ? connections.filter((connection) => connection.kind === "CHRONOLOGICAL") : positions.slice(1).map((_, index) => ({ sourceId: locations[index].id, targetId: locations[index + 1].id, kind: "CHRONOLOGICAL" as const }))).map((connection) => {
+                const source = positionsById.get(connection.sourceId);
+                const target = positionsById.get(connection.targetId);
+                return source && target ? <path className="traveled-route main-road-route" d={routePath(source, target)} key={`road-${connection.sourceId}-${connection.targetId}`} /> : null;
+              })}
+              <path className="uncharted-route" d={routePath(lastBackbonePosition ?? positions[positions.length - 1], unchartedPosition)} />
+              {eventTreeConnections.map((connection) => {
+                const source = positionsById.get(connection.sourceId);
+                const target = positionsById.get(connection.targetId);
+                return source && target ? <path className="branch-route" d={routePath(source, target)} key={`${connection.sourceId}-${connection.targetId}`} /> : null;
+              })}
+            </svg>
+          ) : null}
 
-        {locations.map((location, index) => {
-          const position = positions[index];
-          const isFrontier = index === locations.length - 1;
-          const isBranch = branchLocationIds.has(location.id);
-          return (
-            <button
-              className={`journey-stage ${location.isMainQuestRoot ? "main-road-stage" : ""} ${isBranch ? "branch-stage" : ""} ${isFrontier ? "frontier" : "traveled"} ${selectedId === location.id ? "selected" : ""}`}
-              style={{ left: `${position.x}%`, top: `${position.y}%` }}
-              type="button"
-              key={location.id}
-              onClick={() => setSelectedId(location.id)}
-              aria-label={`Open ${isFrontier ? "latest discovered milestone" : "traveled milestone"}: ${location.title}`}
-            >
-              <span className="stage-marker"><span>{index + 1}</span></span>
-              <strong>{location.title}</strong>
-              {isBranch ? <small>{isFrontier ? "Related frontier" : "Related milestone"}</small> : isFrontier ? <small>Frontier</small> : null}
-            </button>
-          );
-        })}
+          {locations.map((location, index) => {
+            const position = positions[index];
+            const isFrontier = index === locations.length - 1;
+            const isBranch = branchLocationIds.has(location.id);
+            return (
+              <button
+                className={`journey-stage ${location.isMainQuestRoot ? "main-road-stage" : ""} ${isBranch ? "branch-stage" : ""} ${isFrontier ? "frontier" : "traveled"} ${selectedId === location.id ? "selected" : ""}`}
+                style={{ left: `${position.x}px`, top: `${position.y}px` }}
+                type="button"
+                key={location.id}
+                onClick={() => setSelectedId(location.id)}
+                aria-label={`Open ${isFrontier ? "latest discovered milestone" : "traveled milestone"}: ${location.title}`}
+              >
+                <span className="stage-marker"><span>{index + 1}</span></span>
+                <strong>{location.title}</strong>
+                {isBranch ? <small>{isFrontier ? "Related frontier" : "Related milestone"}</small> : isFrontier ? <small>Frontier</small> : null}
+              </button>
+            );
+          })}
 
-        {locations.length ? (
-          <div className="journey-stage uncharted" style={{ left: `${unchartedPosition.x}%`, top: `${unchartedPosition.y}%` }} aria-hidden="true">
-            <span className="stage-marker"><span>?</span></span><strong>Uncharted</strong><small>The road continues</small>
-          </div>
-        ) : (
-          <div className="map-trailhead">
-            <span aria-hidden="true">1</span><p className="eyebrow">YOUR TRAILHEAD</p><h3>The first place is waiting to be remembered</h3><p>Mark a meaningful Adventure Log entry as a World Map milestone, and your journey will begin here.</p><Link href="/adventure-log">Place your first milestone</Link>
-          </div>
-        )}
+          {locations.length ? (
+            <div className="journey-stage uncharted" style={{ left: `${unchartedPosition.x}px`, top: `${unchartedPosition.y}px` }} aria-hidden="true">
+              <span className="stage-marker"><span>?</span></span><strong>Uncharted</strong><small>The road continues</small>
+            </div>
+          ) : (
+            <div className="map-trailhead">
+              <span aria-hidden="true">1</span><p className="eyebrow">YOUR TRAILHEAD</p><h3>The first place is waiting to be remembered</h3><p>Mark a meaningful Adventure Log entry as a World Map milestone, and your journey will begin here.</p><Link href="/adventure-log">Place your first milestone</Link>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="map-legend" aria-label="Map legend"><span><i className="traveled" />{hasMainRoad ? "Main road" : hasBranchAwareFallback ? "Journey path" : "Traveled milestone"}</span>{usesBranchLayout ? <span><i className="branch" />Related milestone</span> : null}<span><i className="frontier" />Latest discovery</span><span><i className="uncharted" />Uncharted road</span></div>

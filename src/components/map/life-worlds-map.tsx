@@ -54,24 +54,26 @@ export function LifeWorldsMap({ worlds }: { worlds: LifeWorld[] }) {
 
   return (
     <section className="life-worlds-overview" aria-label="Life Worlds overview">
-      {worlds.length ? (
-        <div className="life-worlds-board">
-          {worlds.map((world, index) => (
-            <button className={`life-world-region region-${index % 4}`} type="button" onClick={() => setSelectedWorldId(world.id)} key={world.id}>
-              <span className="world-region-label">Life World</span>
-              <strong>{world.title}</strong>
-              <p>{world.description}</p>
-              <div className="world-region-context">
-                {world.activeDirection ? <span><small>Current direction</small>{world.activeDirection.title}</span> : <span><small>Journey</small>This world is still taking shape</span>}
-                {world.latestDiscovery ? <span><small>Latest discovery</small>{world.latestDiscovery.title}<em>{displayDate(world.latestDiscovery.eventDate)}</em></span> : null}
-              </div>
-              <span className="enter-world">Enter world</span>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="life-worlds-empty"><span aria-hidden="true">?</span><p className="eyebrow">AN UNWRITTEN ATLAS</p><h3>Your life worlds are waiting to be discovered</h3><p>Begin with a meaningful direction or place one important memory on the map.</p><div><Link href="/main-quests">Choose a direction</Link><Link href="/adventure-log">Remember a milestone</Link></div></div>
-      )}
+      <div className="map-scroll-viewport life-worlds-viewport">
+        {worlds.length ? (
+          <div className="life-worlds-board">
+            {worlds.map((world, index) => (
+              <button className={`life-world-region region-${index % 4}`} type="button" onClick={() => setSelectedWorldId(world.id)} key={world.id}>
+                <span className="world-region-label">Life World</span>
+                <strong>{world.title}</strong>
+                <p>{world.description}</p>
+                <div className="world-region-context">
+                  {world.activeDirection ? <span><small>Current direction</small>{world.activeDirection.title}</span> : <span><small>Journey</small>This world is still taking shape</span>}
+                  {world.latestDiscovery ? <span><small>Latest discovery</small>{world.latestDiscovery.title}<em>{displayDate(world.latestDiscovery.eventDate)}</em></span> : null}
+                </div>
+                <span className="enter-world">Enter world</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="life-worlds-empty"><span aria-hidden="true">?</span><p className="eyebrow">AN UNWRITTEN ATLAS</p><h3>Your life worlds are waiting to be discovered</h3><p>Begin with a meaningful direction or place one important memory on the map.</p><div><Link href="/main-quests">Choose a direction</Link><Link href="/adventure-log">Remember a milestone</Link></div></div>
+        )}
+      </div>
     </section>
   );
 }
