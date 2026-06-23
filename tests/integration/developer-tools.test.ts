@@ -73,6 +73,7 @@ describe("Developer Tools data reset", () => {
 
     expect(secondCounts).toEqual(firstCounts);
     expect(secondCounts).toEqual({ quests: 1, logs: 3, dailyQuests: 1, locations: 2 });
+    expect(await db.character.count()).toBe(1);
     expect(await db.mainQuest.count({ where: { status: "ACTIVE" } })).toBe(1);
     expect(await db.adventureLog.count({ where: { status: "COMPLETED" } })).toBe(1);
     expect(await db.adventureLog.count({ where: { status: "ONGOING" } })).toBe(2);

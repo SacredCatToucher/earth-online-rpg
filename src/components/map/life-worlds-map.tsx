@@ -35,8 +35,10 @@ function displayDate(value: string) {
   return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "Asia/Taipei" }).format(new Date(value));
 }
 
-export function LifeWorldsMap({ worlds }: { worlds: LifeWorld[] }) {
-  const [selectedWorldId, setSelectedWorldId] = useState<string | null>(null);
+export function LifeWorldsMap({ worlds, initialWorldId }: { worlds: LifeWorld[]; initialWorldId?: string }) {
+  const [selectedWorldId, setSelectedWorldId] = useState<string | null>(() => (
+    initialWorldId && worlds.some((world) => world.id === initialWorldId) ? initialWorldId : null
+  ));
   const selectedWorld = worlds.find((world) => world.id === selectedWorldId) ?? null;
 
   if (selectedWorld) {

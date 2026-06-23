@@ -43,6 +43,7 @@ export async function resetDemoData() {
   phaseTwoDate.setDate(now.getDate() - 2);
 
   await db.$transaction(async (tx) => {
+    await tx.character.create({ data: { name: "Demo Adventurer" } });
     const category = await tx.mainQuestCategory.findUniqueOrThrow({ where: { title: "Career" } });
     const rootLocation = await tx.mapLocation.create({
       data: {
