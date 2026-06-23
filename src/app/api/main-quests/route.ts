@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { createMainQuest, createMainQuestInput } from "@/server/services/main-quest";
 
@@ -11,6 +12,16 @@ const serviceErrors = new Map<string, number>([
   ["The selected Adventure Log tree already belongs to another Main Quest.", 409],
   ["A Main Quest root must be a root Adventure Log entry.", 400],
 ]);
+
+function revalidateQuestDataPages() {
+  for (const path of ["/", "/main-quests", "/adventure-log"]) {
+    try {
+      revalidatePath(path);
+    } catch {
+      // Route-handler tests do not provide Next's request cache context.
+    }
+  }
+}
 
 export async function GET() {
   try {
@@ -29,7 +40,9 @@ export async function POST(request: Request) {
   try {
     const parsed = createMainQuestInput.safeParse(await request.json());
     if (!parsed.success) return Response.json({ error: "Invalid Main Quest input." }, { status: 400 });
-    return Response.json(await createMainQuest(parsed.data), { status: 201 });
+    const quest = await createMainQuest(parsed.data);
+    revalidateQuestDataPages();
+    return Response.json(quest, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     const status = serviceErrors.get(message);

@@ -1,5 +1,6 @@
 import { BackupControls } from "@/components/settings/backup-controls";
 import { CharacterSetup } from "@/components/character/character-setup";
+import { DeveloperTools } from "@/components/settings/developer-tools";
 import { GameNav } from "@/components/navigation/game-nav";
 import { LifeWorldsMap } from "@/components/map/life-worlds-map";
 import { db } from "@/lib/db";
@@ -7,6 +8,7 @@ import { listWorldMap } from "@/server/queries/world-map";
 import { ensureFirstLaunchDefaults } from "@/server/services/bootstrap";
 
 export const dynamic = "force-dynamic";
+const showDeveloperTools = process.env.NODE_ENV !== "production";
 
 function serializeLocation(location: Awaited<ReturnType<typeof listWorldMap>>["locations"][number]) {
   return {
@@ -53,6 +55,8 @@ export default async function Home() {
           connections: world.connections,
         }))} />
       </section>
+
+      {showDeveloperTools ? <DeveloperTools /> : null}
 
       {!character ? <CharacterSetup /> : null}
     </main>
