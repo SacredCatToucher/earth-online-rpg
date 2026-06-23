@@ -24,6 +24,9 @@ type StagePosition = { x: number; y: number };
 const stagesPerRow = 4;
 const fallbackCanvasWidth = 900;
 const stageColumns = [135, 345, 555, 765];
+const branchSiblingGap = 150;
+const branchDepthGap = 150;
+const branchLeftInset = 85;
 
 function stagePosition(index: number, stageCount: number): StagePosition {
   const row = Math.floor(index / stagesPerRow);
@@ -64,13 +67,14 @@ function branchPositions(
     const parent = positionsById.get(parentId);
     const children = childrenByParent.get(parentId) ?? [];
     if (!parent) return;
+    const rowOffset = depth % 2 === 0 ? 40 : 0;
+    const firstChildX = Math.max(branchLeftInset, parent.x - ((children.length - 1) * branchSiblingGap) / 2 + rowOffset);
     children.forEach((childId, index) => {
       if (visited.has(childId)) return;
       visited.add(childId);
-      const siblingOffset = (index - (children.length - 1) / 2) * 100;
       positionsById.set(childId, {
-        x: Math.max(80, parent.x + siblingOffset + (depth % 2 === 0 ? 40 : 0)),
-        y: 140 + depth * 140,
+        x: firstChildX + index * branchSiblingGap,
+        y: 140 + depth * branchDepthGap,
       });
       placeChildren(childId, depth + 1, visited);
     });
