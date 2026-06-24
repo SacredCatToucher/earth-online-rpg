@@ -14,6 +14,7 @@ type WorldLocation = {
   linkedLog: {
     id: string;
     title: string;
+    status: string;
     parent: { id: string; title: string; locationId: string | null } | null;
   } | null;
 };
@@ -89,6 +90,13 @@ function displayDate(value: string) {
   return new Intl.DateTimeFormat("en", { dateStyle: "long", timeZone: "Asia/Taipei" }).format(new Date(value));
 }
 
+function stageState(location: WorldLocation, isFrontier: boolean) {
+  if (location.linkedLog?.status === "ONGOING") return { className: "active", label: "Active" };
+  if (location.linkedLog?.status === "COMPLETED") return { className: "completed", label: "Completed" };
+  if (isFrontier) return { className: "frontier", label: "Latest discovery" };
+  return { className: "traveled", label: "Traveled" };
+}
+
 export function WorldMap({ locations, connections }: { locations: WorldLocation[]; connections: WorldConnection[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = locations.find((location) => location.id === selectedId) ?? null;
@@ -153,18 +161,19 @@ export function WorldMap({ locations, connections }: { locations: WorldLocation[
             const position = positions[index];
             const isFrontier = index === locations.length - 1;
             const isBranch = branchLocationIds.has(location.id);
+            const state = stageState(location, isFrontier);
             return (
               <button
-                className={`journey-stage ${location.isMainQuestRoot ? "main-road-stage" : ""} ${isBranch ? "branch-stage" : ""} ${isFrontier ? "frontier" : "traveled"} ${selectedId === location.id ? "selected" : ""}`}
+                className={`journey-stage ${location.isMainQuestRoot ? "main-road-stage" : ""} ${isBranch ? "branch-stage" : ""} ${state.className} ${selectedId === location.id ? "selected" : ""}`}
                 style={{ left: `${position.x}px`, top: `${position.y}px` }}
                 type="button"
                 key={location.id}
                 onClick={() => setSelectedId(location.id)}
-                aria-label={`Open ${isFrontier ? "latest discovered milestone" : "traveled milestone"}: ${location.title}`}
+                aria-label={`Open ${state.label.toLowerCase()} milestone: ${location.title}`}
               >
                 <span className="stage-marker"><span>{index + 1}</span></span>
                 <strong>{location.title}</strong>
-                {isBranch ? <small>{isFrontier ? "Related frontier" : "Related milestone"}</small> : isFrontier ? <small>Frontier</small> : null}
+                <small>{isBranch && state.className === "completed" ? "Related completed" : isBranch ? `Related ${state.label}` : state.label}</small>
               </button>
             );
           })}
@@ -181,7 +190,7 @@ export function WorldMap({ locations, connections }: { locations: WorldLocation[
         </div>
       </div>
 
-      <div className="map-legend" aria-label="Map legend"><span><i className="traveled" />{hasMainRoad ? "Main road" : hasBranchAwareFallback ? "Journey path" : "Traveled milestone"}</span>{usesBranchLayout ? <span><i className="branch" />Related milestone</span> : null}<span><i className="frontier" />Latest discovery</span><span><i className="uncharted" />Uncharted road</span></div>
+      <div className="map-legend" aria-label="Map legend"><span><i className="traveled" />{hasMainRoad ? "Main road" : hasBranchAwareFallback ? "Journey path" : "Traveled milestone"}</span>{usesBranchLayout ? <span><i className="branch" />Related milestone</span> : null}<span><i className="active" />Active phase</span><span><i className="completed" />Completed phase</span><span><i className="frontier" />Latest discovery</span><span><i className="uncharted" />Uncharted road</span></div>
 
       {selected ? (
         <aside className="map-story-panel" aria-live="polite">

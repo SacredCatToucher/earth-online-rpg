@@ -15,6 +15,7 @@ type WorldLocation = {
   linkedLog: {
     id: string;
     title: string;
+    status: string;
     parent: { id: string; title: string; locationId: string | null } | null;
   } | null;
 };

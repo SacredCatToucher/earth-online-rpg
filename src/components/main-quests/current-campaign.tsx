@@ -22,7 +22,7 @@ export function CurrentCampaign({ campaign }: { campaign: Campaign }) {
     <article className="current-campaign pixel-panel">
       <header className="campaign-heading">
         <div><p className="eyebrow">CURRENT LIFE ARC</p><h3>{campaign.title}</h3></div>
-        <span>{campaign.category.title}</span>
+        <div className="campaign-badges"><span className="quest-status-badge active">Active Quest</span><span>{campaign.category.title}</span></div>
       </header>
       {campaign.description ? <p className="campaign-purpose">{campaign.description}</p> : <p className="campaign-purpose muted">This road is still waiting for its reason to be written.</p>}
 
@@ -38,7 +38,7 @@ export function CurrentCampaign({ campaign }: { campaign: Campaign }) {
           {root?.children.length ? (
             <ol>{root.children.map((entry) => (
               <li key={entry.id}>
-                <div><strong>{entry.title}</strong><small>{displayDate(entry.startDate)} · {entry.status === "ONGOING" ? "Ongoing chapter" : "Completed chapter"}</small></div>
+                <div><strong>{entry.title}</strong><small>{displayDate(entry.startDate)} · {entry.status === "ONGOING" ? "Active Phase" : "Completed Phase"}</small></div>
                 {entry.locationId ? <em>Milestone</em> : null}
               </li>
             ))}</ol>

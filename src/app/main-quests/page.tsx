@@ -24,7 +24,7 @@ function SecondaryQuest({ quest }: { quest: OverviewQuest }) {
   const completedDate = displayDate(quest.completedDate);
   return (
     <article className={`secondary-quest-card ${quest.status.toLowerCase()}`}>
-      <header><span>{quest.category.title}</span><h3>{quest.title}</h3></header>
+      <header><div><span>{quest.category.title}</span><span className={`quest-status-badge ${quest.status.toLowerCase()}`}>{quest.status === "COMPLETED" ? "Completed" : "Draft"}</span></div><h3>{quest.title}</h3></header>
       {quest.description ? <p>{quest.description}</p> : null}
       <footer>
         <span>{completedDate ? `Completed ${completedDate}` : "Not yet begun"}</span>

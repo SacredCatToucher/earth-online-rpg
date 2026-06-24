@@ -1,8 +1,9 @@
 import "dotenv/config";
 import { afterAll, describe, expect, it } from "vitest";
 import { db } from "../../src/lib/db";
-import { createManualJournalEntry, createSystemAdventureEvent, softDeleteAdventureEntry, updateManualJournalEntry } from "../../src/server/services/adventure-log";
+import { completeManualJournalEntry, createManualJournalEntry, createSystemAdventureEvent, softDeleteAdventureEntry, updateManualJournalEntry } from "../../src/server/services/adventure-log";
 import { listAdventureLogs } from "../../src/server/queries/adventure-log";
+import { listWorldMap } from "../../src/server/queries/world-map";
 import { deleteStoredAttachments, readStoredAttachment } from "../../src/server/storage/attachments";
 
 const marker = "Phase 2 test";
@@ -142,5 +143,17 @@ describe("Adventure Log", () => {
       result.entries.findIndex((entry) => entry.id === olderRoot.id),
     );
     expect(root?.children.map((child) => child.id)).toEqual([firstChild.id, secondChild.id]);
+  });
+
+  it("updates mapped phase status after completion", async () => {
+    const root = await createManualJournalEntry({ title: `${marker} mapped root`, startDate: "2026-01-01", isMilestone: true }, []);
+    const phase = await createManualJournalEntry({ title: `${marker} mapped active phase`, startDate: "2026-01-02", parentId: root.id, isMilestone: true }, []);
+
+    expect(phase.status).toBe("ONGOING");
+    await completeManualJournalEntry(phase.id, "2026-01-03");
+    const map = await listWorldMap();
+    const node = map.locations.find((location) => location.id === phase.locationId);
+
+    expect(node?.logs[0]?.status).toBe("COMPLETED");
   });
 });

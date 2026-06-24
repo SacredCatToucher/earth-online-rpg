@@ -63,6 +63,7 @@ export async function listWorldMap() {
           select: {
             id: true,
             title: true,
+            status: true,
             rootForQuest: { select: { id: true } },
             parent: {
               select: {

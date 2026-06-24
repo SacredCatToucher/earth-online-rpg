@@ -72,13 +72,13 @@ describe("Developer Tools data reset", () => {
     const demoWorld = map.worlds.find((world) => world.title === "Career");
 
     expect(secondCounts).toEqual(firstCounts);
-    expect(secondCounts).toEqual({ quests: 1, logs: 3, dailyQuests: 1, locations: 2 });
+    expect(secondCounts).toEqual({ quests: 1, logs: 3, dailyQuests: 1, locations: 3 });
     expect(await db.character.count()).toBe(1);
     expect(await db.mainQuest.count({ where: { status: "ACTIVE" } })).toBe(1);
     expect(await db.adventureLog.count({ where: { status: "COMPLETED" } })).toBe(1);
     expect(await db.adventureLog.count({ where: { status: "ONGOING" } })).toBe(2);
     expect(demoWorld?.activeDirection?.title).toBe("Demo Career Road");
-    expect(demoWorld?.locations).toHaveLength(2);
+    expect(demoWorld?.locations).toHaveLength(3);
     expect(demoWorld?.connections.length).toBeGreaterThan(0);
   });
 
@@ -103,10 +103,22 @@ describe("Developer Tools data reset", () => {
     try {
       const response = await requestDeveloperTool("reset-demo");
       const body = await response.json() as { message?: string };
+      const map = await listWorldMap();
+      const demoWorld = map.worlds.find((world) => world.title === "Career");
 
       expect(response.status).toBe(200);
       expect(body.message).toBe("Demo data has been reset.");
       expect(await db.mainQuest.count({ where: { title: "Demo Career Road" } })).toBe(1);
+      expect(demoWorld?.locations.map((location) => location.title)).toEqual([
+        "Demo Career Road",
+        "Completed demo phase",
+        "Ongoing demo phase",
+      ]);
+      expect(demoWorld?.locations.map((location) => location.logs[0]?.status)).toEqual([
+        "ONGOING",
+        "COMPLETED",
+        "ONGOING",
+      ]);
     } finally {
       vi.unstubAllEnvs();
     }

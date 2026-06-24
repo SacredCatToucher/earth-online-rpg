@@ -19,6 +19,16 @@ const copy = {
   },
 } satisfies Record<ToolAction, { confirmation: string; pending: string; success: string; error: string }>;
 
+async function readDeveloperToolResponse(response: Response) {
+  const text = await response.text().catch(() => "");
+  if (!text.trim()) return {};
+  try {
+    return JSON.parse(text) as { message?: string; error?: string };
+  } catch {
+    return {};
+  }
+}
+
 export function DeveloperTools() {
   const [status, setStatus] = useState("");
   const [pendingAction, setPendingAction] = useState<ToolAction | null>(null);
@@ -27,20 +37,25 @@ export function DeveloperTools() {
     if (!window.confirm(copy[action].confirmation)) return;
     setPendingAction(action);
     setStatus(copy[action].pending);
-    const response = await fetch("/api/developer-tools", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
-    });
-    const result = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
-    if (!response.ok) {
-      setStatus(result.error ?? copy[action].error);
+    try {
+      const response = await fetch("/api/developer-tools", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const result = await readDeveloperToolResponse(response);
+      if (!response.ok) {
+        setStatus(result.error ?? copy[action].error);
+        setPendingAction(null);
+        return;
+      }
+      setStatus(`${result.message ?? copy[action].success} Reloading...`);
       setPendingAction(null);
-      return;
+      window.setTimeout(() => window.location.replace("/"), 50);
+    } catch {
+      setStatus(copy[action].error);
+      setPendingAction(null);
     }
-    setStatus(`${result.message ?? copy[action].success} Reloading...`);
-    window.location.replace("/");
-    setPendingAction(null);
   }
 
   return (

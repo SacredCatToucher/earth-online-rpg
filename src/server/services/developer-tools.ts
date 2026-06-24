@@ -65,6 +65,16 @@ export async function resetDemoData() {
         positionY: 14,
       },
     });
+    const activePhaseLocation = await tx.mapLocation.create({
+      data: {
+        title: "Ongoing demo phase",
+        description: "An active phase placed on the World Map for progress testing.",
+        eventDate: now,
+        locationType: "JOURNAL_MILESTONE",
+        positionX: 50,
+        positionY: 14,
+      },
+    });
     const quest = await tx.mainQuest.create({
       data: {
         categoryId: category.id,
@@ -96,6 +106,7 @@ export async function resetDemoData() {
     await tx.mainQuest.update({ where: { id: quest.id }, data: { rootAdventureLogId: root.id } });
     await tx.mapLocation.update({ where: { id: rootLocation.id }, data: { mainQuestId: quest.id } });
     await tx.mapLocation.update({ where: { id: phaseLocation.id }, data: { mainQuestId: quest.id } });
+    await tx.mapLocation.update({ where: { id: activePhaseLocation.id }, data: { mainQuestId: quest.id } });
     await tx.adventureLog.create({
       data: {
         eventType: "MANUAL_JOURNAL_ENTRY",
@@ -122,6 +133,7 @@ export async function resetDemoData() {
         origin: "MANUAL",
         mainQuestId: quest.id,
         parentId: root.id,
+        locationId: activePhaseLocation.id,
       },
     });
     await tx.dailyQuest.create({

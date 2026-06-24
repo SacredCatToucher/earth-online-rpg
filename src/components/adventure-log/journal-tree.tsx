@@ -1,6 +1,6 @@
 import { JournalEntryDialog } from "@/components/adventure-log/journal-entry-dialog";
 import { DeleteEntryButton } from "@/components/adventure-log/delete-entry-button";
-import { CompleteEntryButton } from "@/components/adventure-log/complete-entry-button";
+import { CompleteEntryButton, PhaseStatusBadge } from "@/components/adventure-log/complete-entry-button";
 import { EVENT_PRESENTATION, isAdventureEventType } from "@/lib/adventure-log";
 import type { AdventureLogTreeNode } from "@/server/queries/adventure-log";
 
@@ -17,8 +17,8 @@ function Entry({ entry, depth, parentOptions }: { entry: AdventureLogTreeNode; d
   return (
     <li className={`timeline-entry quest-chain-entry tone-${presentation.tone}`} data-depth={depth}>
       <div className="timeline-sigil" aria-hidden="true">{presentation.sigil}</div>
-      <article className="journal-card pixel-panel" id={`entry-${entry.id}`}>
-        <div className="entry-heading"><div><span className="event-ribbon">{presentation.label}</span><span className={`event-status ${entry.status.toLowerCase()}`}>{entry.status === "ONGOING" ? "Ongoing" : "Completed"}</span><time dateTime={entry.startDate.toISOString()}>{formatDate(entry.startDate)}{entry.endDate ? ` - ${formatDate(entry.endDate)}` : ""}</time><h2>{entry.title}</h2></div>{entry.expEarned ? <strong className="entry-exp">+{entry.expEarned} EXP</strong> : null}</div>
+      <article className={`journal-card pixel-panel phase-${entry.status.toLowerCase()}`} id={`entry-${entry.id}`}>
+        <div className="entry-heading"><div><span className="event-ribbon">{presentation.label}</span><PhaseStatusBadge id={entry.id} initialStatus={entry.status} /><time dateTime={entry.startDate.toISOString()}>{formatDate(entry.startDate)}{entry.endDate ? ` - ${formatDate(entry.endDate)}` : ""}</time><h2>{entry.title}</h2></div>{entry.expEarned ? <strong className="entry-exp">+{entry.expEarned} EXP</strong> : null}</div>
         {entry.parent ? <p className={`chain-context ${entry.detachedFilterMatch ? "detached" : ""}`}>{entry.detachedFilterMatch ? "Shown independently because its parent is outside these filters: " : "Part of "}<a href={`#entry-${entry.parent.id}`}>{entry.parent.title}</a></p> : null}
         {entry.description ? <p className="entry-description">{entry.description}</p> : null}
         {images.length ? <div className={`memory-gallery count-${Math.min(images.length, 3)}`}>{images.map((image) => <a href={`/api/adventure-logs/${entry.id}/attachments/${image.id}`} target="_blank" rel="noreferrer" key={image.id}><img src={`/api/adventure-logs/${entry.id}/attachments/${image.id}`} alt={image.originalName} /></a>)}</div> : null}

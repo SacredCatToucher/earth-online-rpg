@@ -24,6 +24,7 @@ function serializeLocation(location: Awaited<ReturnType<typeof listWorldMap>>["l
     linkedLog: location.logs[0] ? {
       id: location.logs[0].id,
       title: location.logs[0].title,
+      status: location.logs[0].status,
       parent: location.logs[0].parent ? {
         id: location.logs[0].parent.id,
         title: location.logs[0].parent.title,
