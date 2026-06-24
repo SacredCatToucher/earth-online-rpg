@@ -1,23 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import { useLanguage } from "@/components/i18n/language-provider";
+import type { TranslationKey } from "@/lib/i18n";
 
 type ToolAction = "clear" | "reset-demo";
 
 const copy = {
   clear: {
-    confirmation: "This will delete current local data. This action cannot be undone. Continue?",
-    pending: "Clearing local data...",
-    success: "All local data has been cleared.",
-    error: "Failed to clear local data. Please try again.",
+    confirmation: "dev.clearConfirm",
+    pending: "dev.clearPending",
+    success: "dev.clearSuccess",
+    error: "dev.clearError",
   },
   "reset-demo": {
-    confirmation: "This will delete current local data and rebuild demo data. This action cannot be undone. Continue?",
-    pending: "Resetting demo data...",
-    success: "Demo data has been reset.",
-    error: "Failed to reset demo data. Please try again.",
+    confirmation: "dev.resetConfirm",
+    pending: "dev.resetPending",
+    success: "dev.resetSuccess",
+    error: "dev.resetError",
   },
-} satisfies Record<ToolAction, { confirmation: string; pending: string; success: string; error: string }>;
+} satisfies Record<ToolAction, { confirmation: TranslationKey; pending: TranslationKey; success: TranslationKey; error: TranslationKey }>;
 
 async function readDeveloperToolResponse(response: Response) {
   const text = await response.text().catch(() => "");
@@ -30,13 +32,14 @@ async function readDeveloperToolResponse(response: Response) {
 }
 
 export function DeveloperTools() {
+  const { t } = useLanguage();
   const [status, setStatus] = useState("");
   const [pendingAction, setPendingAction] = useState<ToolAction | null>(null);
 
   async function runAction(action: ToolAction) {
-    if (!window.confirm(copy[action].confirmation)) return;
+    if (!window.confirm(t(copy[action].confirmation))) return;
     setPendingAction(action);
-    setStatus(copy[action].pending);
+    setStatus(t(copy[action].pending));
     try {
       const response = await fetch("/api/developer-tools", {
         method: "POST",
@@ -45,15 +48,15 @@ export function DeveloperTools() {
       });
       const result = await readDeveloperToolResponse(response);
       if (!response.ok) {
-        setStatus(result.error ?? copy[action].error);
+        setStatus(result.error && response.status === 403 ? result.error : t(copy[action].error));
         setPendingAction(null);
         return;
       }
-      setStatus(`${result.message ?? copy[action].success} Reloading...`);
+      setStatus(`${t(copy[action].success)} ${t("dev.reloading")}`);
       setPendingAction(null);
       window.setTimeout(() => window.location.replace("/"), 50);
     } catch {
-      setStatus(copy[action].error);
+      setStatus(t(copy[action].error));
       setPendingAction(null);
     }
   }
@@ -61,31 +64,31 @@ export function DeveloperTools() {
   return (
     <section className="developer-tools pixel-panel" aria-labelledby="developer-tools-title">
       <div>
-        <p className="eyebrow">Developer Tools</p>
-        <h2 id="developer-tools-title">Local testing controls</h2>
-        <p>Tools for local testing and development.</p>
+        <p className="eyebrow">{t("dev.title")}</p>
+        <h2 id="developer-tools-title">{t("dev.localControls")}</h2>
+        <p>{t("dev.subtitle")}</p>
       </div>
-      <div className="danger-zone" aria-label="Danger Zone">
+      <div className="danger-zone" aria-label={t("dev.danger")}>
         <div>
-          <h3>Danger Zone</h3>
-          <p>These actions can delete or rebuild local data. Use them carefully.</p>
+          <h3>{t("dev.danger")}</h3>
+          <p>{t("dev.warning")}</p>
         </div>
         <article>
           <div>
-            <strong>Clear all data</strong>
-            <p>Delete current local test data and return the app to an empty state. Useful for testing new-user and first-minute flows.</p>
+            <strong>{t("dev.clear")}</strong>
+            <p>{t("dev.clearDescription")}</p>
           </div>
           <button className="danger-button" type="button" onClick={() => runAction("clear")} disabled={pendingAction !== null}>
-            Clear all data
+            {t("dev.clear")}
           </button>
         </article>
         <article>
           <div>
-            <strong>Reset demo data</strong>
-            <p>Delete current local data and rebuild demo data for testing Main Quest, Phase, Daily Quest, Adventure Log, World Map, and Life Worlds.</p>
+            <strong>{t("dev.reset")}</strong>
+            <p>{t("dev.resetDescription")}</p>
           </div>
           <button className="text-button" type="button" onClick={() => runAction("reset-demo")} disabled={pendingAction !== null}>
-            Reset demo data
+            {t("dev.reset")}
           </button>
         </article>
         <span className="developer-tools-status" aria-live="polite">{status}</span>

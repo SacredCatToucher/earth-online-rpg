@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/components/i18n/language-provider";
 import { localDateInputValue } from "@/lib/dates";
 
 export function CompleteMainQuestButton({ id }: { id: string }) {
+  const { t } = useLanguage();
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
   async function complete() {
-    if (!window.confirm("Complete this Main Quest today?")) return;
+    if (!window.confirm(t("mainQuest.completeConfirm"))) return;
     setPending(true);
     setError("");
     const response = await fetch(`/api/main-quests/${id}/complete`, {
@@ -20,7 +22,7 @@ export function CompleteMainQuestButton({ id }: { id: string }) {
     });
     const body = (await response.json()) as { error?: string };
     if (!response.ok) {
-      setError(body.error ?? "The Main Quest could not be completed.");
+      setError(body.error ?? t("mainQuest.completeError"));
       setPending(false);
       return;
     }
@@ -29,7 +31,7 @@ export function CompleteMainQuestButton({ id }: { id: string }) {
 
   return (
     <div className="quest-complete-action">
-      <button type="button" onClick={complete} disabled={pending}>{pending ? "Completing..." : "Complete Main Quest"}</button>
+      <button type="button" onClick={complete} disabled={pending}>{pending ? t("mainQuest.completing") : t("mainQuest.complete")}</button>
       {error ? <p role="alert">{error}</p> : null}
     </div>
   );

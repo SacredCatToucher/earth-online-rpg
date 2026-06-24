@@ -2,9 +2,11 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/components/i18n/language-provider";
 import { localDateInputValue } from "@/lib/dates";
 
 export function ActivateMainQuestForm({ id }: { id: string }) {
+  const { t } = useLanguage();
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -21,7 +23,7 @@ export function ActivateMainQuestForm({ id }: { id: string }) {
     });
     const body = (await response.json()) as { error?: string };
     if (!response.ok) {
-      setError(body.error ?? "The Main Quest could not be activated.");
+      setError(body.error ?? t("mainQuest.activateError"));
       setPending(false);
       return;
     }
@@ -30,8 +32,8 @@ export function ActivateMainQuestForm({ id }: { id: string }) {
 
   return (
     <form className="quest-activate-form" onSubmit={submit}>
-      <label>Start date<input name="startDate" type="date" defaultValue={localDateInputValue()} required /></label>
-      <button type="submit" disabled={pending}>{pending ? "Activating..." : "Activate Main Quest"}</button>
+      <label>{t("mainQuest.startDate")}<input name="startDate" type="date" defaultValue={localDateInputValue()} required /></label>
+      <button type="submit" disabled={pending}>{pending ? t("mainQuest.activating") : t("mainQuest.activate")}</button>
       {error ? <p role="alert">{error}</p> : null}
     </form>
   );

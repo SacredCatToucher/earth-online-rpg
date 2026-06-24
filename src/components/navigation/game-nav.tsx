@@ -1,24 +1,34 @@
 import Link from "next/link";
+import { T } from "@/components/i18n/language-provider";
+import type { TranslationKey } from "@/lib/i18n";
 
 const items = [
-  { label: "World Map", href: "/", enabled: true, key: "map" },
-  { label: "Adventure Log", href: "/adventure-log", enabled: true, key: "journal" },
-  { label: "Main Quests", href: "/main-quests", enabled: true, key: "quests" },
-  { label: "Daily Quests", href: "/daily-quests", enabled: true, key: "daily" },
-  { label: "Skills", href: "#", enabled: false, key: "skills" },
-  { label: "Achievements", href: "#", enabled: false, key: "achievements" },
-];
+  { labelKey: "nav.worldMap", href: "/", enabled: true, key: "map" },
+  { labelKey: "nav.adventureLog", href: "/adventure-log", enabled: true, key: "journal" },
+  { labelKey: "nav.mainQuests", href: "/main-quests", enabled: true, key: "quests" },
+  { labelKey: "nav.dailyQuests", href: "/daily-quests", enabled: true, key: "daily" },
+  { labelKey: "nav.skills", href: "#", enabled: false, key: "skills" },
+  { labelKey: "nav.achievements", href: "#", enabled: false, key: "achievements" },
+] satisfies { labelKey: TranslationKey; href: string; enabled: boolean; key: string }[];
+
+function label(key: TranslationKey) {
+  return <T k={key} />;
+}
+
+function soon() {
+  return <T k="common.soon" />;
+}
 
 export function GameNav({ active }: { active: "map" | "journal" | "quests" | "daily" }) {
   return (
     <nav className="rpg-nav" aria-label="Main menu">
       {items.map((item) =>
         item.enabled ? (
-          <Link key={item.label} className={active === item.key ? "active" : ""} href={item.href} aria-current={active === item.key ? "page" : undefined}>
-            {item.label}
+          <Link key={item.key} className={active === item.key ? "active" : ""} href={item.href} aria-current={active === item.key ? "page" : undefined}>
+            {label(item.labelKey)}
           </Link>
         ) : (
-          <span className="nav-disabled" key={item.label}>{item.label}<small>soon</small></span>
+          <span className="nav-disabled" key={item.key}>{label(item.labelKey)}<small>{soon()}</small></span>
         ),
       )}
     </nav>

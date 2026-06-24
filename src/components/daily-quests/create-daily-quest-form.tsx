@@ -2,9 +2,11 @@
 
 import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/components/i18n/language-provider";
 import { DAILY_QUEST_WEEKDAYS, type DailyQuestWeekday } from "@/lib/daily-quest";
 
 export function CreateDailyQuestForm() {
+  const { t } = useLanguage();
   const form = useRef<HTMLFormElement>(null);
   const router = useRouter();
   const [weekdays, setWeekdays] = useState<DailyQuestWeekday[]>([...DAILY_QUEST_WEEKDAYS]);
@@ -32,7 +34,7 @@ export function CreateDailyQuestForm() {
     });
     const body = (await response.json()) as { error?: string };
     if (!response.ok) {
-      setError(body.error ?? "The Daily Quest could not be created.");
+      setError(body.error ?? t("daily.createError"));
       setPending(false);
       return;
     }
@@ -44,13 +46,13 @@ export function CreateDailyQuestForm() {
 
   return (
     <form className="daily-quest-form pixel-panel" ref={form} onSubmit={submit}>
-      <div className="daily-form-heading"><div><p className="eyebrow">NEW RITUAL</p><h2>Create Daily Quest</h2></div><p>Define a repeatable action that supports the life you are building.</p></div>
-      <label>Quest title<input name="title" maxLength={120} required /></label>
-      <label>Description<textarea name="description" maxLength={20000} rows={4} /></label>
-      <fieldset className="weekday-picker"><legend>Repeat days</legend>{DAILY_QUEST_WEEKDAYS.map((day) => <label key={day}><input type="checkbox" checked={weekdays.includes(day)} onChange={(event) => toggleWeekday(day, event.target.checked)} /><span>{day}</span></label>)}</fieldset>
-      <label className="daily-active-toggle"><input name="isActive" type="checkbox" value="true" defaultChecked /><span><strong>Active quest</strong><small>Paused quests remain in your list without becoming current rituals.</small></span></label>
+      <div className="daily-form-heading"><div><p className="eyebrow">{t("daily.newRitual")}</p><h2>{t("daily.create")}</h2></div><p>{t("daily.createDescription")}</p></div>
+      <label>{t("daily.questTitle")}<input name="title" maxLength={120} required /></label>
+      <label>{t("daily.descriptionLabel")}<textarea name="description" maxLength={20000} rows={4} /></label>
+      <fieldset className="weekday-picker"><legend>{t("daily.repeatDays")}</legend>{DAILY_QUEST_WEEKDAYS.map((day) => <label key={day}><input type="checkbox" checked={weekdays.includes(day)} onChange={(event) => toggleWeekday(day, event.target.checked)} /><span>{day}</span></label>)}</fieldset>
+      <label className="daily-active-toggle"><input name="isActive" type="checkbox" value="true" defaultChecked /><span><strong>{t("daily.activeQuest")}</strong><small>{t("daily.activeHelp")}</small></span></label>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
-      <button className="pixel-button daily-submit" type="submit" disabled={pending}>{pending ? "Creating quest..." : "Create Daily Quest"}</button>
+      <button className="pixel-button daily-submit" type="submit" disabled={pending}>{pending ? t("daily.creating") : t("daily.create")}</button>
     </form>
   );
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { T } from "@/components/i18n/language-provider";
 import { GameNav } from "@/components/navigation/game-nav";
 import { JournalEntryDialog } from "@/components/adventure-log/journal-entry-dialog";
 import { JournalTree } from "@/components/adventure-log/journal-tree";
@@ -29,25 +30,25 @@ export default async function AdventureLogPage({ searchParams }: PageProps) {
   return (
     <main className="game-shell journal-shell">
       <header className="journal-header">
-        <div><p className="eyebrow">CHRONICLE OF A LIFE</p><h1>Adventure Log</h1><p>Every quest leaves a story. Keep the parts you want your future self to find.</p></div>
+        <div><p className="eyebrow"><T k="journal.eyebrow" /></p><h1><T k="journal.title" /></h1><p><T k="journal.description" /></p></div>
         <JournalEntryDialog parentOptions={parentOptions} />
       </header>
       <GameNav active="journal" />
 
       <form className="journal-filters pixel-panel" method="get">
-        <label>Search the chronicle<input name="search" defaultValue={filters.search} placeholder="A title or remembered detail..." /></label>
-        <label>Event type<select name="type" defaultValue={filters.type}><option value="">All events</option>{ADVENTURE_EVENT_TYPES.map((type) => <option value={type} key={type}>{EVENT_PRESENTATION[type].label}</option>)}</select></label>
-        <label>From<input name="from" type="date" defaultValue={filters.from} /></label>
-        <label>To<input name="to" type="date" defaultValue={filters.to} /></label>
+        <label><T k="journal.search" /><input name="search" defaultValue={filters.search} placeholder="A title or remembered detail..." /></label>
+        <label><T k="journal.eventType" /><select name="type" defaultValue={filters.type}><option value=""><T k="journal.allEvents" /></option>{ADVENTURE_EVENT_TYPES.map((type) => <option value={type} key={type}>{EVENT_PRESENTATION[type].label}</option>)}</select></label>
+        <label><T k="journal.from" /><input name="from" type="date" defaultValue={filters.from} /></label>
+        <label><T k="journal.to" /><input name="to" type="date" defaultValue={filters.to} /></label>
         <button className="text-button" type="submit">Search</button>
-        <Link className="filter-clear" href="/adventure-log">Clear</Link>
+        <Link className="filter-clear" href="/adventure-log"><T k="journal.clear" /></Link>
       </form>
 
-      <div className="chronicle-summary"><span>{result.totalMatches} matching {result.totalMatches === 1 ? "event" : "events"} across {result.totalBranches} quest {result.totalBranches === 1 ? "branch" : "branches"}</span><span>Branches newest first</span></div>
+      <div className="chronicle-summary"><span>{result.totalMatches} matching {result.totalMatches === 1 ? "event" : "events"} across {result.totalBranches} quest {result.totalBranches === 1 ? "branch" : "branches"}</span><span><T k="journal.branchesNewest" /></span></div>
       {result.entries.length ? (
         <JournalTree entries={result.entries} parentOptions={parentOptions} />
       ) : (
-        <section className="empty-chronicle pixel-panel"><span className="empty-book">J</span><h2>{hasFilters ? "No memories match these runes" : "Your chronicle awaits"}</h2><p>{hasFilters ? "Change the search or clear the filters." : "Write the first entry. Begin with a moment you never want to lose."}</p></section>
+        <section className="empty-chronicle pixel-panel"><span className="empty-book">J</span><h2>{hasFilters ? <T k="journal.noMatchesTitle" /> : <T k="journal.emptyTitle" />}</h2><p>{hasFilters ? <T k="journal.noMatchesDescription" /> : <T k="journal.emptyDescription" />}</p></section>
       )}
       {result.pageCount > 1 ? <nav className="journal-pagination" aria-label="Quest branch pages">{result.page > 1 ? <Link href={queryForPage(result.page - 1)}>Newer branches</Link> : <span /> }<span>Branch page {result.page} of {result.pageCount}</span>{result.page < result.pageCount ? <Link href={queryForPage(result.page + 1)}>Older branches</Link> : <span />}</nav> : null}
     </main>

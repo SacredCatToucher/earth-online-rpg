@@ -2,15 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useLanguage } from "@/components/i18n/language-provider";
 import { localDateInputValue } from "@/lib/dates";
 
 const phaseCompletedEvent = "rpg-life:phase-completed";
 
-function phaseStatusLabel(status: string) {
-  return status === "ONGOING" ? "Active Phase" : "Completed Phase";
-}
-
 export function PhaseStatusBadge({ id, initialStatus }: { id: string; initialStatus: string }) {
+  const { t } = useLanguage();
   const [status, setStatus] = useState(initialStatus);
 
   useEffect(() => {
@@ -22,10 +20,11 @@ export function PhaseStatusBadge({ id, initialStatus }: { id: string; initialSta
     return () => window.removeEventListener(phaseCompletedEvent, handleCompleted);
   }, [id]);
 
-  return <span className={`event-status ${status.toLowerCase()}`}>{phaseStatusLabel(status)}</span>;
+  return <span className={`event-status ${status.toLowerCase()}`}>{status === "ONGOING" ? t("phase.active") : t("phase.completed")}</span>;
 }
 
 export function CompleteEntryButton({ id }: { id: string }) {
+  const { t } = useLanguage();
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -50,20 +49,20 @@ export function CompleteEntryButton({ id }: { id: string }) {
     const body = (await response.json().catch(() => ({}))) as { error?: string };
     if (response.ok) {
       setCompleted(true);
-      setMessage("Nice work - your journey just moved forward!");
+      setMessage(t("phase.success"));
       const card = document.getElementById(`entry-${id}`);
       card?.classList.remove("phase-ongoing");
       card?.classList.add("phase-completed");
       window.dispatchEvent(new CustomEvent(phaseCompletedEvent, { detail: { id } }));
       router.refresh();
     } else {
-      setError(body.error ?? "Failed to complete phase. Please try again.");
+      setError(body.error ?? t("phase.error"));
     }
     setPending(false);
   }
   return (
     <span className="phase-complete-control">
-      {!completed ? <button className="entry-action complete" type="button" onClick={complete} disabled={pending}>{pending ? "Completing..." : "Complete Phase"}</button> : null}
+      {!completed ? <button className="entry-action complete" type="button" onClick={complete} disabled={pending}>{pending ? t("phase.completing") : t("phase.complete")}</button> : null}
       {error ? <small className="phase-complete-error" role="alert">{error}</small> : null}
       {message ? <span className="phase-complete-toast" role="status">{message}</span> : null}
     </span>

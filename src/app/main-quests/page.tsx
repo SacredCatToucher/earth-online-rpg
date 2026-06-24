@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { T } from "@/components/i18n/language-provider";
 import { ActivateMainQuestForm } from "@/components/main-quests/activate-main-quest-form";
 import { CreateMainQuestForm } from "@/components/main-quests/create-main-quest-form";
 import { CurrentCampaign } from "@/components/main-quests/current-campaign";
@@ -24,7 +25,7 @@ function SecondaryQuest({ quest }: { quest: OverviewQuest }) {
   const completedDate = displayDate(quest.completedDate);
   return (
     <article className={`secondary-quest-card ${quest.status.toLowerCase()}`}>
-      <header><div><span>{quest.category.title}</span><span className={`quest-status-badge ${quest.status.toLowerCase()}`}>{quest.status === "COMPLETED" ? "Completed" : "Draft"}</span></div><h3>{quest.title}</h3></header>
+      <header><div><span>{quest.category.title}</span><span className={`quest-status-badge ${quest.status.toLowerCase()}`}>{quest.status === "COMPLETED" ? <T k="common.completed" /> : <T k="common.draft" />}</span></div><h3>{quest.title}</h3></header>
       {quest.description ? <p>{quest.description}</p> : null}
       <footer>
         <span>{completedDate ? `Completed ${completedDate}` : "Not yet begun"}</span>
@@ -44,7 +45,7 @@ export default async function MainQuestsPage() {
 
   return (
     <main className="game-shell main-quest-shell">
-      <header className="main-quest-header"><div><p className="eyebrow">THE LONG ROAD</p><h1>Main Quests</h1><p>See the directions shaping your life and the journey already unfolding behind you.</p></div></header>
+      <header className="main-quest-header"><div><p className="eyebrow"><T k="mainQuest.eyebrow" /></p><h1><T k="mainQuest.title" /></h1><p><T k="mainQuest.description" /></p></div></header>
       <GameNav active="quests" />
 
       <section className="campaign-section" aria-labelledby="campaign-title">
@@ -57,7 +58,7 @@ export default async function MainQuestsPage() {
       </section>
 
       <details className="new-campaign-panel">
-        <summary><span><strong>Chart a new road</strong><small>Create another Main Quest when a direction deserves a lasting journey.</small></span></summary>
+        <summary><span><strong><T k="mainQuest.chartNewRoad" /></strong><small><T k="mainQuest.chartNewRoadHelp" /></small></span></summary>
         <CreateMainQuestForm categories={categories.map(({ id, title }) => ({ id, title }))} />
       </details>
 

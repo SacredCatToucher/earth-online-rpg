@@ -2,16 +2,18 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 export function DeleteEntryButton({ id }: { id: string }) {
+  const { t } = useLanguage();
   const router = useRouter();
   const [pending, setPending] = useState(false);
   async function remove() {
-    if (!window.confirm("Remove this entry from the visible timeline? Its memory will remain recoverable in local data.")) return;
+    if (!window.confirm(t("journal.deleteConfirm"))) return;
     setPending(true);
     const response = await fetch(`/api/adventure-logs/${id}`, { method: "DELETE" });
     if (response.ok) router.refresh();
     else setPending(false);
   }
-  return <button className="entry-action danger" type="button" onClick={remove} disabled={pending}>{pending ? "Removing..." : "Remove"}</button>;
+  return <button className="entry-action danger" type="button" onClick={remove} disabled={pending}>{pending ? t("journal.removing") : t("journal.remove")}</button>;
 }

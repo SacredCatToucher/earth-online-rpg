@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 export function DailyQuestCompletionButton({ id, completed }: { id: string; completed: boolean }) {
+  const { t } = useLanguage();
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -14,7 +16,7 @@ export function DailyQuestCompletionButton({ id, completed }: { id: string; comp
     const response = await fetch(`/api/daily-quests/${id}/complete`, { method: completed ? "DELETE" : "POST" });
     const body = (await response.json()) as { error?: string };
     if (!response.ok) {
-      setError(body.error ?? "Today's step could not be updated.");
+      setError(body.error ?? t("daily.completionError"));
       setPending(false);
       return;
     }
@@ -23,9 +25,9 @@ export function DailyQuestCompletionButton({ id, completed }: { id: string; comp
 
   return (
     <div className={`daily-completion-action ${completed ? "completed" : ""}`}>
-      {completed ? <p><strong>Step taken.</strong> You moved this part of your journey forward today.</p> : null}
+      {completed ? <p><strong>{t("daily.stepTaken")}</strong> {t("daily.stepTakenHelp")}</p> : null}
       <button type="button" onClick={updateCompletion} disabled={pending}>
-        {pending ? "Updating..." : completed ? "Undo today's step" : "Mark today's step complete"}
+        {pending ? t("daily.updating") : completed ? t("daily.undoToday") : t("daily.completeToday")}
       </button>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
     </div>

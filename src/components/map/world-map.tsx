@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useLanguage } from "@/components/i18n/language-provider";
+import type { TranslationKey } from "@/lib/i18n";
 
 type WorldLocation = {
   id: string;
@@ -90,14 +92,15 @@ function displayDate(value: string) {
   return new Intl.DateTimeFormat("en", { dateStyle: "long", timeZone: "Asia/Taipei" }).format(new Date(value));
 }
 
-function stageState(location: WorldLocation, isFrontier: boolean) {
-  if (location.linkedLog?.status === "ONGOING") return { className: "active", label: "Active" };
-  if (location.linkedLog?.status === "COMPLETED") return { className: "completed", label: "Completed" };
-  if (isFrontier) return { className: "frontier", label: "Latest discovery" };
-  return { className: "traveled", label: "Traveled" };
+function stageState(location: WorldLocation, isFrontier: boolean): { className: string; labelKey: TranslationKey } {
+  if (location.linkedLog?.status === "ONGOING") return { className: "active", labelKey: "worldMap.active" };
+  if (location.linkedLog?.status === "COMPLETED") return { className: "completed", labelKey: "worldMap.completed" };
+  if (isFrontier) return { className: "frontier", labelKey: "worldMap.latest" };
+  return { className: "traveled", labelKey: "worldMap.traveled" };
 }
 
 export function WorldMap({ locations, connections }: { locations: WorldLocation[]; connections: WorldConnection[] }) {
+  const { t } = useLanguage();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = locations.find((location) => location.id === selectedId) ?? null;
   const mainRoadLocations = locations.filter((location) => location.isMainQuestRoot);
@@ -136,7 +139,7 @@ export function WorldMap({ locations, connections }: { locations: WorldLocation[
   return (
     <>
       <div className="map-scroll-viewport journey-map-viewport">
-        <div className="journey-map-board" style={{ width: `${mapWidth}px`, height: `${mapHeight}px`, minWidth: "100%", minHeight: "100%" }} aria-label="World Map of life milestones">
+        <div className="journey-map-board" style={{ width: `${mapWidth}px`, height: `${mapHeight}px`, minWidth: "100%", minHeight: "100%" }} aria-label={t("nav.worldMap")}>
           <div className="terrain-region terrain-west" aria-hidden="true" />
           <div className="terrain-region terrain-east" aria-hidden="true" />
           <div className="terrain-region terrain-south" aria-hidden="true" />
@@ -162,6 +165,7 @@ export function WorldMap({ locations, connections }: { locations: WorldLocation[
             const isFrontier = index === locations.length - 1;
             const isBranch = branchLocationIds.has(location.id);
             const state = stageState(location, isFrontier);
+            const stateLabel = t(state.labelKey);
             return (
               <button
                 className={`journey-stage ${location.isMainQuestRoot ? "main-road-stage" : ""} ${isBranch ? "branch-stage" : ""} ${state.className} ${selectedId === location.id ? "selected" : ""}`}
@@ -169,39 +173,39 @@ export function WorldMap({ locations, connections }: { locations: WorldLocation[
                 type="button"
                 key={location.id}
                 onClick={() => setSelectedId(location.id)}
-                aria-label={`Open ${state.label.toLowerCase()} milestone: ${location.title}`}
+                aria-label={`${stateLabel}: ${location.title}`}
               >
                 <span className="stage-marker"><span>{index + 1}</span></span>
                 <strong>{location.title}</strong>
-                <small>{isBranch && state.className === "completed" ? "Related completed" : isBranch ? `Related ${state.label}` : state.label}</small>
+                <small>{isBranch && state.className === "completed" ? t("worldMap.relatedCompleted") : isBranch ? `${t("worldMap.related")} ${stateLabel}` : stateLabel}</small>
               </button>
             );
           })}
 
           {locations.length ? (
             <div className="journey-stage uncharted" style={{ left: `${unchartedPosition.x}px`, top: `${unchartedPosition.y}px` }} aria-hidden="true">
-              <span className="stage-marker"><span>?</span></span><strong>Uncharted</strong><small>The road continues</small>
+              <span className="stage-marker"><span>?</span></span><strong>{t("worldMap.uncharted")}</strong><small>{t("worldMap.roadContinues")}</small>
             </div>
           ) : (
             <div className="map-trailhead">
-              <span aria-hidden="true">1</span><p className="eyebrow">YOUR TRAILHEAD</p><h3>The first place is waiting to be remembered</h3><p>Mark a meaningful Adventure Log entry as a World Map milestone, and your journey will begin here.</p><Link href="/adventure-log">Place your first milestone</Link>
+              <span aria-hidden="true">1</span><p className="eyebrow">{t("worldMap.trailheadEyebrow")}</p><h3>{t("worldMap.trailheadTitle")}</h3><p>{t("worldMap.trailheadDescription")}</p><Link href="/adventure-log">{t("worldMap.placeFirstMilestone")}</Link>
             </div>
           )}
         </div>
       </div>
 
-      <div className="map-legend" aria-label="Map legend"><span><i className="traveled" />{hasMainRoad ? "Main road" : hasBranchAwareFallback ? "Journey path" : "Traveled milestone"}</span>{usesBranchLayout ? <span><i className="branch" />Related milestone</span> : null}<span><i className="active" />Active phase</span><span><i className="completed" />Completed phase</span><span><i className="frontier" />Latest discovery</span><span><i className="uncharted" />Uncharted road</span></div>
+      <div className="map-legend" aria-label="Map legend"><span><i className="traveled" />{hasMainRoad ? t("worldMap.mainRoad") : hasBranchAwareFallback ? t("worldMap.journeyPath") : t("worldMap.traveledMilestone")}</span>{usesBranchLayout ? <span><i className="branch" />{t("worldMap.relatedMilestone")}</span> : null}<span><i className="active" />{t("worldMap.activePhase")}</span><span><i className="completed" />{t("worldMap.completedPhase")}</span><span><i className="frontier" />{t("worldMap.latestDiscovery")}</span><span><i className="uncharted" />{t("worldMap.unchartedRoad")}</span></div>
 
       {selected ? (
         <aside className="map-story-panel" aria-live="polite">
-          <button type="button" onClick={() => setSelectedId(null)} aria-label="Close location details">Close</button>
-          <div><p className="eyebrow">MILESTONE {locations.findIndex((item) => item.id === selected.id) + 1}</p><time dateTime={selected.eventDate}>{displayDate(selected.eventDate)}</time><h3>{selected.title}</h3><p>{selected.description || "A meaningful place in your journey."}</p></div>
+          <button type="button" onClick={() => setSelectedId(null)} aria-label={t("common.close")}>{t("common.close")}</button>
+          <div><p className="eyebrow">{t("worldMap.milestone")} {locations.findIndex((item) => item.id === selected.id) + 1}</p><time dateTime={selected.eventDate}>{displayDate(selected.eventDate)}</time><h3>{selected.title}</h3><p>{selected.description || t("worldMap.defaultDescription")}</p></div>
           <footer>
-            {selected.linkedLog?.parent ? <div className="map-parent-context"><span>Continues from</span><Link href={`/adventure-log?search=${encodeURIComponent(selected.linkedLog.parent.title)}#entry-${selected.linkedLog.parent.id}`}>{selected.linkedLog.parent.title}</Link></div> : null}
-            {selected.linkedLog ? <Link href={`/adventure-log?search=${encodeURIComponent(selected.linkedLog.title)}#entry-${selected.linkedLog.id}`}>Open linked Adventure Log entry</Link> : <span className="map-unlinked">No linked Adventure Log entry</span>}
+            {selected.linkedLog?.parent ? <div className="map-parent-context"><span>{t("worldMap.continuesFrom")}</span><Link href={`/adventure-log?search=${encodeURIComponent(selected.linkedLog.parent.title)}#entry-${selected.linkedLog.parent.id}`}>{selected.linkedLog.parent.title}</Link></div> : null}
+            {selected.linkedLog ? <Link href={`/adventure-log?search=${encodeURIComponent(selected.linkedLog.title)}#entry-${selected.linkedLog.id}`}>{t("worldMap.openLinkedLog")}</Link> : <span className="map-unlinked">{t("worldMap.noLinkedLog")}</span>}
           </footer>
         </aside>
-      ) : <p className="map-hint">Choose a discovered stage to revisit the story held there.</p>}
+      ) : <p className="map-hint">{t("worldMap.hint")}</p>}
     </>
   );
 }

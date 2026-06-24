@@ -2,10 +2,12 @@
 
 import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 type CategoryOption = { id: string; title: string };
 
 export function CreateMainQuestForm({ categories }: { categories: CategoryOption[] }) {
+  const { t } = useLanguage();
   const form = useRef<HTMLFormElement>(null);
   const router = useRouter();
   const [error, setError] = useState("");
@@ -35,7 +37,7 @@ export function CreateMainQuestForm({ categories }: { categories: CategoryOption
     });
     const body = (await response.json()) as { error?: string };
     if (!response.ok) {
-      setError(body.error ?? "The Main Quest could not be created.");
+      setError(body.error ?? t("mainQuest.createError"));
       setPending(false);
       return;
     }
@@ -47,23 +49,23 @@ export function CreateMainQuestForm({ categories }: { categories: CategoryOption
   return (
     <form className="main-quest-form pixel-panel" ref={form} onSubmit={submit}>
       <div className="quest-form-heading">
-        <div><p className="eyebrow">NEW CAMPAIGN</p><h2>Create Main Quest</h2></div>
-        <p>Begin a long-term objective and give it a permanent root in your Adventure Log.</p>
+        <div><p className="eyebrow">{t("mainQuest.newCampaign")}</p><h2>{t("mainQuest.create")}</h2></div>
+        <p>{t("mainQuest.createDescription")}</p>
       </div>
       <div className="main-quest-form-grid">
-        <label>Category<select name="categoryId" required>{categories.map((category) => <option value={category.id} key={category.id}>{category.title}</option>)}</select></label>
-        <label>Status<select name="status" defaultValue="DRAFT"><option value="DRAFT">Draft</option><option value="ACTIVE">Active</option></select></label>
-        <label className="quest-title-field">Quest title<input name="title" maxLength={120} required /></label>
-        <label className="quest-description-field">Description<textarea name="description" maxLength={20000} rows={5} /></label>
-        <label>Progress type<select name="progressType" defaultValue="PERCENTAGE"><option value="PERCENTAGE">Percentage</option><option value="COUNT">Count</option></select></label>
-        <label>Unit<input name="unit" defaultValue="%" maxLength={20} required /></label>
-        <label>Current value<input name="currentValue" type="number" min={0} defaultValue={0} required /></label>
-        <label>Target value<input name="targetValue" type="number" min={1} defaultValue={100} required /></label>
-        <label>Start date<input name="startDate" type="date" /></label>
-        <label className="milestone-toggle quest-root-map-toggle"><input name="placeRootOnWorldMap" type="checkbox" value="true" /><span><strong>Place root on World Map</strong><small>Create a milestone location for the quest root.</small></span></label>
+        <label>{t("mainQuest.category")}<select name="categoryId" required>{categories.map((category) => <option value={category.id} key={category.id}>{category.title}</option>)}</select></label>
+        <label>{t("mainQuest.status")}<select name="status" defaultValue="DRAFT"><option value="DRAFT">{t("common.draft")}</option><option value="ACTIVE">{t("worldMap.active")}</option></select></label>
+        <label className="quest-title-field">{t("mainQuest.questTitle")}<input name="title" maxLength={120} required /></label>
+        <label className="quest-description-field">{t("mainQuest.descriptionLabel")}<textarea name="description" maxLength={20000} rows={5} /></label>
+        <label>{t("mainQuest.progressType")}<select name="progressType" defaultValue="PERCENTAGE"><option value="PERCENTAGE">{t("mainQuest.percentage")}</option><option value="COUNT">{t("mainQuest.count")}</option></select></label>
+        <label>{t("mainQuest.unit")}<input name="unit" defaultValue="%" maxLength={20} required /></label>
+        <label>{t("mainQuest.currentValue")}<input name="currentValue" type="number" min={0} defaultValue={0} required /></label>
+        <label>{t("mainQuest.targetValue")}<input name="targetValue" type="number" min={1} defaultValue={100} required /></label>
+        <label>{t("mainQuest.startDate")}<input name="startDate" type="date" /></label>
+        <label className="milestone-toggle quest-root-map-toggle"><input name="placeRootOnWorldMap" type="checkbox" value="true" /><span><strong>{t("mainQuest.placeRoot")}</strong><small>{t("mainQuest.placeRootHelp")}</small></span></label>
       </div>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
-      <button className="pixel-button quest-submit" type="submit" disabled={pending || !categories.length}>{pending ? "Creating quest..." : "Create Main Quest"}</button>
+      <button className="pixel-button quest-submit" type="submit" disabled={pending || !categories.length}>{pending ? t("mainQuest.creating") : t("mainQuest.create")}</button>
     </form>
   );
 }

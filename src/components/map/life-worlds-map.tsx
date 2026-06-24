@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useLanguage } from "@/components/i18n/language-provider";
 import { WorldMap } from "@/components/map/world-map";
 
 type WorldLocation = {
@@ -37,6 +38,7 @@ function displayDate(value: string) {
 }
 
 export function LifeWorldsMap({ worlds, initialWorldId }: { worlds: LifeWorld[]; initialWorldId?: string }) {
+  const { t } = useLanguage();
   const [selectedWorldId, setSelectedWorldId] = useState<string | null>(() => (
     initialWorldId && worlds.some((world) => world.id === initialWorldId) ? initialWorldId : null
   ));
@@ -46,9 +48,9 @@ export function LifeWorldsMap({ worlds, initialWorldId }: { worlds: LifeWorld[];
     return (
       <section className="region-journey" aria-labelledby="region-journey-title">
         <header className="region-journey-heading">
-          <button type="button" onClick={() => setSelectedWorldId(null)}>Back to Life Worlds</button>
-          <div><p className="eyebrow">ENTERED WORLD</p><h3 id="region-journey-title">{selectedWorld.title}</h3><p>{selectedWorld.description}</p></div>
-          {selectedWorld.activeDirection ? <aside><span>Current direction</span><strong>{selectedWorld.activeDirection.title}</strong></aside> : null}
+          <button type="button" onClick={() => setSelectedWorldId(null)}>{t("worldMap.backToLifeWorlds")}</button>
+          <div><p className="eyebrow">{t("worldMap.enteredWorld")}</p><h3 id="region-journey-title">{selectedWorld.title}</h3><p>{selectedWorld.description}</p></div>
+          {selectedWorld.activeDirection ? <aside><span>{t("worldMap.currentDirection")}</span><strong>{selectedWorld.activeDirection.title}</strong></aside> : null}
         </header>
         <WorldMap key={selectedWorld.id} locations={selectedWorld.locations} connections={selectedWorld.connections} />
       </section>
@@ -56,25 +58,25 @@ export function LifeWorldsMap({ worlds, initialWorldId }: { worlds: LifeWorld[];
   }
 
   return (
-    <section className="life-worlds-overview" aria-label="Life Worlds overview">
+    <section className="life-worlds-overview" aria-label={t("worldMap.lifeWorlds")}>
       <div className="map-scroll-viewport life-worlds-viewport">
         {worlds.length ? (
           <div className="life-worlds-board">
             {worlds.map((world, index) => (
               <button className={`life-world-region region-${index % 4}`} type="button" onClick={() => setSelectedWorldId(world.id)} key={world.id}>
-                <span className="world-region-label">Life World</span>
+                <span className="world-region-label">{t("worldMap.lifeWorld")}</span>
                 <strong>{world.title}</strong>
                 <p>{world.description}</p>
                 <div className="world-region-context">
-                  {world.activeDirection ? <span><small>Current direction</small>{world.activeDirection.title}</span> : <span><small>Journey</small>This world is still taking shape</span>}
-                  {world.latestDiscovery ? <span><small>Latest discovery</small>{world.latestDiscovery.title}<em>{displayDate(world.latestDiscovery.eventDate)}</em></span> : null}
+                  {world.activeDirection ? <span><small>{t("worldMap.currentDirection")}</small>{world.activeDirection.title}</span> : <span><small>{t("worldMap.journey")}</small>{t("worldMap.worldTakingShape")}</span>}
+                  {world.latestDiscovery ? <span><small>{t("worldMap.latestDiscovery")}</small>{world.latestDiscovery.title}<em>{displayDate(world.latestDiscovery.eventDate)}</em></span> : null}
                 </div>
-                <span className="enter-world">Enter world</span>
+                <span className="enter-world">{t("worldMap.enterWorld")}</span>
               </button>
             ))}
           </div>
         ) : (
-          <div className="life-worlds-empty"><span aria-hidden="true">?</span><p className="eyebrow">AN UNWRITTEN ATLAS</p><h3>Your life worlds are waiting to be discovered</h3><p>Begin with a meaningful direction or place one important memory on the map.</p><div><Link href="/main-quests">Choose a direction</Link><Link href="/adventure-log">Remember a milestone</Link></div></div>
+          <div className="life-worlds-empty"><span aria-hidden="true">?</span><p className="eyebrow">{t("worldMap.emptyEyebrow")}</p><h3>{t("worldMap.emptyTitle")}</h3><p>{t("worldMap.emptyDescription")}</p><div><Link href="/main-quests">{t("worldMap.chooseDirection")}</Link><Link href="/adventure-log">{t("worldMap.rememberMilestone")}</Link></div></div>
         )}
       </div>
     </section>
