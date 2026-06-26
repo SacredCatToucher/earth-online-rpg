@@ -75,29 +75,35 @@ model MainQuest {
 }
 
 model DailyQuest {
-  id          String                 @id @default(cuid())
-  title       String
-  description String                 @default("")
-  expReward   Int                    @default(0)
-  daysOfWeek  String
-  resetTime   String                 @default("00:00")
-  timezone    String                 @default("Asia/Taipei")
-  isActive    Boolean                @default(true)
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @updatedAt
-  completions DailyQuestCompletion[]
-  attachments Attachment[]
+  id                        String                 @id @default(cuid())
+  title                     String
+  description               String                 @default("")
+  expReward                 Int                    @default(0)
+  daysOfWeek                String
+  resetTime                 String                 @default("00:00")
+  timezone                  String                 @default("Asia/Taipei")
+  isActive                  Boolean                @default(true)
+  contributionEnabled       Boolean                @default(false)
+  weeklyTargetAmount        Float?
+  contributionUnit          String?
+  defaultContributionAmount Float?
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
+  completions               DailyQuestCompletion[]
+  attachments               Attachment[]
 }
 
 model DailyQuestCompletion {
-  id           String     @id @default(cuid())
-  dailyQuestId String
-  questDate    String
-  completedAt  DateTime   @default(now())
-  expAwarded   Int
-  dailyQuest   DailyQuest @relation(fields: [dailyQuestId], references: [id], onDelete: Cascade)
+  id                 String     @id @default(cuid())
+  dailyQuestId       String
+  questDate          String
+  completedAt        DateTime   @default(now())
+  expAwarded         Int
+  contributionAmount Float?
+  dailyQuest         DailyQuest @relation(fields: [dailyQuestId], references: [id], onDelete: Cascade)
 
   @@unique([dailyQuestId, questDate])
+  @@index([dailyQuestId, questDate])
 }
 
 model Skill {

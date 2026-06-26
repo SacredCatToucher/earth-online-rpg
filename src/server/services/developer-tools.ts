@@ -145,5 +145,18 @@ export async function resetDemoData() {
         expReward: 0,
       },
     });
+    await tx.dailyQuest.create({
+      data: {
+        title: "Run today",
+        description: "A progress Daily Quest for testing weekly contribution.",
+        daysOfWeek: normalizeDailyQuestWeekdays([dailyQuestWeekday()]),
+        isActive: true,
+        expReward: 0,
+        contributionEnabled: true,
+        weeklyTargetAmount: 20,
+        contributionUnit: "km",
+        defaultContributionAmount: 3,
+      },
+    });
   });
 }

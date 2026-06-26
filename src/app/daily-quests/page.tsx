@@ -11,6 +11,15 @@ export const dynamic = "force-dynamic";
 export default async function DailyQuestsPage() {
   const quests = await listDailyQuests();
   const todaysQuests = quests.filter((quest) => (quest.isActive && quest.isScheduledToday) || quest.isCompletedToday);
+  const allTodayComplete = todaysQuests.length > 0 && todaysQuests.every((quest) => quest.isCompletedToday);
+  const contributionFor = (quest: (typeof quests)[number]) => ({
+    enabled: quest.contributionEnabled,
+    weeklyTargetAmount: quest.weeklyTargetAmount,
+    contributionUnit: quest.contributionUnit,
+    defaultContributionAmount: quest.defaultContributionAmount,
+    weeklyProgressAmount: quest.weeklyProgressAmount,
+    todayContributionAmount: quest.todayContributionAmount,
+  });
 
   return (
     <main className="game-shell daily-quest-shell">
@@ -23,10 +32,11 @@ export default async function DailyQuestsPage() {
             <article className={`daily-today-card pixel-panel ${quest.isCompletedToday ? "completed" : ""}`} key={quest.id}>
               <h3>{quest.title}</h3>
               {quest.description ? <p>{quest.description}</p> : null}
-              <DailyQuestCompletionButton id={quest.id} completed={quest.isCompletedToday} />
+              <DailyQuestCompletionButton id={quest.id} completed={quest.isCompletedToday} contribution={contributionFor(quest)} />
             </article>
           )) : <p className="daily-empty pixel-panel">No steps are set for today. The journey can have quiet days too.</p>}
         </div>
+        {allTodayComplete ? <p className="daily-clear-message pixel-panel"><T k="daily.todayClear" /></p> : null}
       </section>
       <CreateDailyQuestForm />
       <div className="daily-section-heading"><div><p className="eyebrow"><T k="daily.pathNotes" /></p><h2><T k="daily.definitions" /></h2></div><p><T k="daily.definitionsHelp" /></p></div>
@@ -36,7 +46,24 @@ export default async function DailyQuestsPage() {
             <header><span className="daily-status">{quest.isActive ? "Active" : "Paused"}</span><h2>{quest.title}</h2></header>
             {quest.description ? <p>{quest.description}</p> : null}
             <div className="daily-cadence"><span>Repeat pattern</span><strong>{formatDailyQuestCadence(quest.daysOfWeek)}</strong></div>
-            <EditDailyQuestForm quest={{ id: quest.id, title: quest.title, description: quest.description, daysOfWeek: quest.daysOfWeek, isActive: quest.isActive }} />
+            {quest.contributionEnabled ? (
+              <div className="daily-definition-progress">
+                <span><T k="daily.progressQuest" /></span>
+                <strong><T k="daily.thisWeek" />: {quest.weeklyProgressAmount} / {quest.weeklyTargetAmount} {quest.contributionUnit}</strong>
+                <small><T k="daily.defaultToday" />: {quest.defaultContributionAmount} {quest.contributionUnit}</small>
+              </div>
+            ) : null}
+            <EditDailyQuestForm quest={{
+              id: quest.id,
+              title: quest.title,
+              description: quest.description,
+              daysOfWeek: quest.daysOfWeek,
+              isActive: quest.isActive,
+              contributionEnabled: quest.contributionEnabled,
+              weeklyTargetAmount: quest.weeklyTargetAmount,
+              contributionUnit: quest.contributionUnit,
+              defaultContributionAmount: quest.defaultContributionAmount,
+            }} />
           </article>
         )) : <p className="daily-empty pixel-panel"><T k="daily.empty" /></p>}
       </section>

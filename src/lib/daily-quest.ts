@@ -20,6 +20,19 @@ export function canonicalDailyQuestDate(date = new Date()) {
   return localDateInputValue(date);
 }
 
+export function dailyQuestWeekRange(date = new Date()) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const mondayOffset = (start.getDay() + 6) % 7;
+  start.setDate(start.getDate() - mondayOffset);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  return {
+    start: canonicalDailyQuestDate(start),
+    end: canonicalDailyQuestDate(end),
+  };
+}
+
 export function dailyQuestWeekday(date = new Date()) {
   return weekdaysByIndex[date.getDay()];
 }

@@ -72,8 +72,17 @@ describe("Developer Tools data reset", () => {
     const demoWorld = map.worlds.find((world) => world.title === "Career");
 
     expect(secondCounts).toEqual(firstCounts);
-    expect(secondCounts).toEqual({ quests: 1, logs: 3, dailyQuests: 1, locations: 3 });
+    expect(secondCounts).toEqual({ quests: 1, logs: 3, dailyQuests: 2, locations: 3 });
     expect(await db.character.count()).toBe(1);
+    expect(await db.dailyQuest.count({
+      where: {
+        title: "Run today",
+        contributionEnabled: true,
+        weeklyTargetAmount: 20,
+        contributionUnit: "km",
+        defaultContributionAmount: 3,
+      },
+    })).toBe(1);
     expect(await db.mainQuest.count({ where: { status: "ACTIVE" } })).toBe(1);
     expect(await db.adventureLog.count({ where: { status: "COMPLETED" } })).toBe(1);
     expect(await db.adventureLog.count({ where: { status: "ONGOING" } })).toBe(2);

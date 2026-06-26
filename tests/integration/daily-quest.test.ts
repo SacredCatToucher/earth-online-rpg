@@ -5,6 +5,7 @@ import { db } from "../../src/lib/db";
 import {
   canonicalDailyQuestDate,
   DAILY_QUEST_WEEKDAYS,
+  dailyQuestWeekRange,
   dailyQuestWeekday,
   type DailyQuestWeekday,
 } from "../../src/lib/daily-quest";
@@ -42,6 +43,60 @@ describe("Daily Quest foundation", () => {
     expect(quest.daysOfWeek).toBe("MON,FRI,SUN");
     expect(quest.expReward).toBe(0);
     expect(quest.isActive).toBe(true);
+    expect(quest.contributionEnabled).toBe(false);
+    expect(quest.weeklyTargetAmount).toBeNull();
+  });
+
+  it("creates and edits progress contribution settings", async () => {
+    const quest = await createDailyQuest({
+      title: `${marker} progress settings`,
+      description: "Run toward a weekly target.",
+      weekdays: todayWeekdays(),
+      contributionEnabled: true,
+      weeklyTargetAmount: 20,
+      contributionUnit: "km",
+      defaultContributionAmount: 3,
+    });
+
+    expect(quest.contributionEnabled).toBe(true);
+    expect(quest.weeklyTargetAmount).toBe(20);
+    expect(quest.contributionUnit).toBe("km");
+    expect(quest.defaultContributionAmount).toBe(3);
+
+    const updated = await updateDailyQuest(quest.id, {
+      title: `${marker} progress settings updated`,
+      weekdays: todayWeekdays(),
+      contributionEnabled: false,
+    });
+
+    expect(updated.contributionEnabled).toBe(false);
+    expect(updated.weeklyTargetAmount).toBeNull();
+    expect(updated.contributionUnit).toBeNull();
+    expect(updated.defaultContributionAmount).toBeNull();
+  });
+
+  it("validates progress contribution settings only when enabled", async () => {
+    await expect(
+      createDailyQuest({
+        title: `${marker} invalid progress settings`,
+        weekdays: todayWeekdays(),
+        contributionEnabled: true,
+        weeklyTargetAmount: 0,
+        contributionUnit: "",
+        defaultContributionAmount: 0,
+      }),
+    ).rejects.toThrow();
+
+    await expect(
+      createDailyQuest({
+        title: `${marker} disabled progress blank settings`,
+        weekdays: todayWeekdays(),
+        contributionEnabled: false,
+        weeklyTargetAmount: null,
+        contributionUnit: "",
+        defaultContributionAmount: null,
+      }),
+    ).resolves.toMatchObject({ contributionEnabled: false });
   });
 
   it("rejects empty and invalid repeat patterns without creating definitions", async () => {
@@ -106,9 +161,77 @@ describe("Daily Quest completion foundation", () => {
     expect(completion.questDate).toBe(canonicalDailyQuestDate());
     expect(completion.questDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(completion.expAwarded).toBe(0);
+    expect(completion.contributionAmount).toBeNull();
     expect(await db.dailyQuestCompletion.count({ where: { dailyQuestId: quest.id } })).toBe(1);
     const listed = (await listDailyQuests()).find((item) => item.id === quest.id);
     expect(listed).toMatchObject({ isScheduledToday: true, isCompletedToday: true });
+  });
+
+  it("completes a progress quest with a contribution amount and updates this week's total", async () => {
+    const quest = await createDailyQuest({
+      title: `${marker} progress completion`,
+      weekdays: todayWeekdays(),
+      contributionEnabled: true,
+      weeklyTargetAmount: 20,
+      contributionUnit: "km",
+      defaultContributionAmount: 3,
+    });
+
+    const completion = await completeDailyQuestToday(quest.id, { contributionAmount: 5 });
+    const listed = (await listDailyQuests()).find((item) => item.id === quest.id);
+
+    expect(completion.contributionAmount).toBe(5);
+    expect(completion.weeklyProgressAmount).toBe(5);
+    expect(listed).toMatchObject({
+      isCompletedToday: true,
+      todayContributionAmount: 5,
+      weeklyProgressAmount: 5,
+      contributionEnabled: true,
+      weeklyTargetAmount: 20,
+      contributionUnit: "km",
+      defaultContributionAmount: 3,
+    });
+  });
+
+  it("sums only contribution records in the current Monday-through-Sunday week", async () => {
+    const quest = await createDailyQuest({
+      title: `${marker} weekly sum`,
+      weekdays: todayWeekdays(),
+      contributionEnabled: true,
+      weeklyTargetAmount: 20,
+      contributionUnit: "km",
+      defaultContributionAmount: 3,
+    });
+    const week = dailyQuestWeekRange();
+    const beforeWeek = new Date(`${week.start}T00:00:00.000`);
+    beforeWeek.setDate(beforeWeek.getDate() - 1);
+    await db.dailyQuestCompletion.create({
+      data: {
+        dailyQuestId: quest.id,
+        questDate: canonicalDailyQuestDate(beforeWeek),
+        expAwarded: 0,
+        contributionAmount: 99,
+      },
+    });
+
+    await completeDailyQuestToday(quest.id, { contributionAmount: 4 });
+    const listed = (await listDailyQuests()).find((item) => item.id === quest.id);
+
+    expect(listed?.weeklyProgressAmount).toBe(4);
+  });
+
+  it("requires a contribution amount for progress quest completion", async () => {
+    const quest = await createDailyQuest({
+      title: `${marker} missing contribution`,
+      weekdays: todayWeekdays(),
+      contributionEnabled: true,
+      weeklyTargetAmount: 10,
+      contributionUnit: "km",
+      defaultContributionAmount: 2,
+    });
+
+    await expect(completeDailyQuestToday(quest.id)).rejects.toThrow("Contribution amount must be greater than 0.");
+    expect(await db.dailyQuestCompletion.count({ where: { dailyQuestId: quest.id } })).toBe(0);
   });
 
   it("rejects duplicate completion without adding another record", async () => {
