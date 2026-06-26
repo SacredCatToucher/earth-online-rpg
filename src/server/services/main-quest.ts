@@ -39,6 +39,13 @@ export const updateMainQuestProgressInput = z.object({
 
 export type UpdateMainQuestProgressInput = z.input<typeof updateMainQuestProgressInput>;
 
+export const createMainQuestNextStepInput = z.object({
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(20_000).default(""),
+});
+
+export type CreateMainQuestNextStepInput = z.input<typeof createMainQuestNextStepInput>;
+
 async function collectDescendantIds(tx: Prisma.TransactionClient, rootId: string) {
   const ids = [rootId];
   let parentIds = [rootId];
@@ -265,5 +272,49 @@ export async function updateMainQuestProgress(id: string, input: UpdateMainQuest
   return db.mainQuest.update({
     where: { id: quest.id },
     data: { currentValue: parsed.currentValue },
+  });
+}
+
+export async function createMainQuestNextStep(id: string, input: CreateMainQuestNextStepInput) {
+  const parsed = createMainQuestNextStepInput.parse(input);
+  const now = new Date();
+
+  return db.$transaction(async (tx) => {
+    const quest = await tx.mainQuest.findFirst({
+      where: { id, deletedAt: null },
+      include: { rootAdventureLog: true },
+    });
+    if (!quest) throw new Error("Main Quest not found.");
+    if (quest.status !== "ACTIVE") throw new Error("Only active Main Quests can add next steps.");
+    if (!quest.rootAdventureLog || quest.rootAdventureLog.deletedAt) throw new Error("Main Quest root journey not found.");
+
+    const location = quest.rootAdventureLog.locationId
+      ? await tx.mapLocation.create({
+          data: {
+            ...(await journalMilestoneCreateData(tx, {
+              title: parsed.title,
+              description: parsed.description,
+              eventDate: now,
+            })),
+            mainQuestId: quest.id,
+          },
+        })
+      : null;
+
+    return tx.adventureLog.create({
+      data: {
+        eventType: "MANUAL_JOURNAL_ENTRY",
+        title: parsed.title,
+        description: parsed.description,
+        eventDate: now,
+        startDate: now,
+        status: "ONGOING",
+        origin: "MANUAL",
+        mainQuestId: quest.id,
+        parentId: quest.rootAdventureLog.id,
+        locationId: location?.id,
+      },
+      include: { location: true },
+    });
   });
 }

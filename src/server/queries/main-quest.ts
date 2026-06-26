@@ -10,7 +10,6 @@ export async function listMainQuestOverview() {
           children: {
             where: { deletedAt: null },
             orderBy: [{ startDate: "desc" }, { createdAt: "desc" }],
-            take: 3,
           },
         },
       },

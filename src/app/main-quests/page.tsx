@@ -52,7 +52,7 @@ export default async function MainQuestsPage() {
         <div className="quest-section-heading"><div><p className="eyebrow">WHERE YOU ARE HEADING</p><h2 id="campaign-title">{overview.activeCampaigns.length === 1 ? "Current Campaign" : "Current Campaigns"}</h2></div><p>These are the life directions you are actively choosing to move toward.</p></div>
         <div className="campaign-list">
           {overview.activeCampaigns.length ? overview.activeCampaigns.map((campaign) => <CurrentCampaign campaign={campaign} key={campaign.id} />) : (
-            <div className="campaign-empty pixel-panel"><h3>No current campaign</h3><p>Choose a possible road below, or chart a new direction when one matters enough to begin.</p></div>
+            <div className="campaign-empty pixel-panel"><h3><T k="mainQuest.noCurrentCampaign" /></h3><p><T k="mainQuest.noActiveQuest" /></p></div>
           )}
         </div>
       </section>

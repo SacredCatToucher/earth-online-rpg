@@ -3,7 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { db } from "../../src/lib/db";
 import { listWorldMap, WIDER_JOURNEY_WORLD_ID } from "../../src/server/queries/world-map";
 import { createManualJournalEntry } from "../../src/server/services/adventure-log";
-import { createMainQuest } from "../../src/server/services/main-quest";
+import { createMainQuest, createMainQuestNextStep } from "../../src/server/services/main-quest";
 
 const marker = "Phase 4 World Map test";
 
@@ -158,5 +158,36 @@ describe("World Map event tree connections", () => {
     expect(await db.mainQuest.count()).toBe(countsBefore.quests);
     expect(await db.adventureLog.count()).toBe(countsBefore.logs);
     expect(await db.mapLocation.count()).toBe(countsBefore.locations);
+  });
+
+  it("shows a mapped Main Quest next step as a route node without changing completed phases", async () => {
+    const category = await db.mainQuestCategory.create({ data: { title: `${marker} Next Step World` } });
+    const quest = await createMainQuest({
+      categoryId: category.id,
+      title: `${marker} mapped next step quest`,
+      progressType: "COUNT",
+      status: "ACTIVE",
+      placeRootOnWorldMap: true,
+    });
+    const completed = await createManualJournalEntry(
+      { title: `${marker} completed before next step`, startDate: "2026-01-02", parentId: quest.rootAdventureLogId!, status: "COMPLETED", isMilestone: true },
+      [],
+    );
+
+    const nextStep = await createMainQuestNextStep(quest.id, { title: `${marker} route next step` });
+    const map = await listWorldMap();
+    const world = map.worlds.find((item) => item.id === category.id);
+    const nextLocation = map.locations.find((location) => location.logs[0]?.id === nextStep.id);
+    const completedLocation = map.locations.find((location) => location.logs[0]?.id === completed.id);
+
+    expect(nextStep.locationId).toBeTruthy();
+    expect(nextLocation?.logs[0]?.status).toBe("ONGOING");
+    expect(completedLocation?.logs[0]?.status).toBe("COMPLETED");
+    expect(world?.locations.some((location) => location.id === nextStep.locationId)).toBe(true);
+    expect(world?.connections).toContainEqual({
+      sourceId: quest.rootAdventureLog?.locationId,
+      targetId: nextStep.locationId,
+      kind: "EVENT_TREE",
+    });
   });
 });

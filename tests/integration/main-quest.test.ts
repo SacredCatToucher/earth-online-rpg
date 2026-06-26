@@ -4,7 +4,7 @@ import { db } from "../../src/lib/db";
 import { listAdventureLogs } from "../../src/server/queries/adventure-log";
 import { listMainQuestOverview } from "../../src/server/queries/main-quest";
 import { createManualJournalEntry } from "../../src/server/services/adventure-log";
-import { activateMainQuest, completeMainQuest, createMainQuest, updateMainQuestProgress } from "../../src/server/services/main-quest";
+import { activateMainQuest, completeMainQuest, createMainQuest, createMainQuestNextStep, updateMainQuestProgress } from "../../src/server/services/main-quest";
 
 const marker = "Phase 4 Main Quest test";
 
@@ -304,6 +304,47 @@ describe("Main Quest backend foundation", () => {
     expect(updated.status).toBe("ACTIVE");
     expect(updated.completedDate).toBeNull();
     expect(await db.adventureLog.count({ where: { mainQuestId: quest.id } })).toBe(eventCount);
+  });
+
+  it("adds the next step under an active Main Quest root and persists it in the overview", async () => {
+    const category = await createCategory("next step category");
+    const quest = await createMainQuest({
+      categoryId: category.id,
+      title: `${marker} next step quest`,
+      progressType: "COUNT",
+      status: "ACTIVE",
+    });
+
+    const step = await createMainQuestNextStep(quest.id, {
+      title: `${marker} next step phase`,
+      description: "A small path forward.",
+    });
+    const persisted = await db.adventureLog.findUniqueOrThrow({ where: { id: step.id } });
+    const overview = await listMainQuestOverview();
+    const campaign = overview.activeCampaigns.find((item) => item.id === quest.id);
+
+    expect(step.status).toBe("ONGOING");
+    expect(step.origin).toBe("MANUAL");
+    expect(step.parentId).toBe(quest.rootAdventureLogId);
+    expect(step.mainQuestId).toBe(quest.id);
+    expect(step.locationId).toBeNull();
+    expect(persisted.title).toBe(`${marker} next step phase`);
+    expect(campaign?.rootAdventureLog?.children.some((entry) => entry.id === step.id)).toBe(true);
+  });
+
+  it("rejects adding a next step when the Main Quest is not active", async () => {
+    const category = await createCategory("draft next step category");
+    const quest = await createMainQuest({
+      categoryId: category.id,
+      title: `${marker} draft next step quest`,
+      progressType: "COUNT",
+      status: "DRAFT",
+    });
+
+    await expect(createMainQuestNextStep(quest.id, { title: `${marker} blocked next step` })).rejects.toThrow(
+      "Only active Main Quests can add next steps.",
+    );
+    expect(await db.adventureLog.count({ where: { title: `${marker} blocked next step` } })).toBe(0);
   });
 
   it("rejects progress outside the quest range", async () => {

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { T } from "@/components/i18n/language-provider";
+import { CampaignStepSummary } from "@/components/main-quests/campaign-step-summary";
 import { CompleteMainQuestButton } from "@/components/main-quests/complete-main-quest-button";
 import { MainQuestProgressForm } from "@/components/main-quests/main-quest-progress-form";
 import type { listMainQuestOverview } from "@/server/queries/main-quest";
@@ -17,6 +18,7 @@ function adventureLogLink(campaign: Campaign) {
 
 export function CurrentCampaign({ campaign }: { campaign: Campaign }) {
   const root = campaign.rootAdventureLog;
+  const steps = root?.children ?? [];
   const progress = Math.min(100, Math.max(0, (campaign.currentValue / Math.max(1, campaign.targetValue)) * 100));
 
   return (
@@ -34,17 +36,16 @@ export function CurrentCampaign({ campaign }: { campaign: Campaign }) {
           <small>{campaign.startDate ? <><T k="mainQuest.began" /> {displayDate(campaign.startDate)}</> : <T k="mainQuest.notDated" />}</small>
           <Link href={adventureLogLink(campaign)}><T k="mainQuest.openJourney" /></Link>
         </div>
-        <div className="campaign-chapters">
-          <span><T k="mainQuest.recentNotes" /></span>
-          {root?.children.length ? (
-            <ol>{root.children.map((entry) => (
-              <li key={entry.id}>
-                <div><strong>{entry.title}</strong><small>{displayDate(entry.startDate)} - {entry.status === "ONGOING" ? <T k="phase.active" /> : <T k="phase.completed" />}</small></div>
-                {entry.locationId ? <em><T k="worldMap.milestone" /></em> : null}
-              </li>
-            ))}</ol>
-          ) : <p><T k="mainQuest.roadBegins" /></p>}
-        </div>
+        <CampaignStepSummary
+          questId={campaign.id}
+          initialSteps={steps.map((entry) => ({
+            id: entry.id,
+            title: entry.title,
+            startDate: entry.startDate.toISOString(),
+            status: entry.status,
+            locationId: entry.locationId,
+          }))}
+        />
       </section>
 
       <section className="campaign-progress" aria-label={`Progress controls for ${campaign.title}`}>
