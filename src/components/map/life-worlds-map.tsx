@@ -17,6 +17,7 @@ type WorldLocation = {
     id: string;
     title: string;
     status: string;
+    mainQuestStatus: string | null;
     parent: { id: string; title: string; locationId: string | null } | null;
   } | null;
 };

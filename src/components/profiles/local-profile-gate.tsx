@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useLanguage } from "@/components/i18n/language-provider";
 import type { TranslationKey } from "@/lib/i18n";
-import { currentProfileStorageKey, profileNameMaxLength } from "@/lib/profiles";
+import { currentProfileStorageKey, profileNameMaxLength, rememberCurrentProfileId } from "@/lib/profiles";
 
 type ProfileSummary = {
   id: string;
@@ -17,24 +17,38 @@ const errorTranslationKeys = {
   PROFILE_CREATE_FAILED: "profile.createError",
 } satisfies Record<string, TranslationKey>;
 
-export function LocalProfileGate({ initialProfiles }: { initialProfiles: ProfileSummary[] }) {
+export function LocalProfileGate() {
   const { t } = useLanguage();
-  const [profiles, setProfiles] = useState(initialProfiles);
+  const [profiles, setProfiles] = useState<ProfileSummary[] | null>(null);
   const [currentProfileId, setCurrentProfileId] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
   const currentProfile = useMemo(
-    () => profiles.find((profile) => profile.id === currentProfileId) ?? profiles[0] ?? null,
+    () => profiles?.find((profile) => profile.id === currentProfileId) ?? profiles?.[0] ?? null,
     [currentProfileId, profiles],
   );
 
   useEffect(() => {
+    let ignore = false;
+    async function loadProfiles() {
+      const response = await fetch("/api/profiles");
+      const body = (await response.json().catch(() => ({ profiles: [] }))) as { profiles?: ProfileSummary[] };
+      if (!ignore) setProfiles(body.profiles ?? []);
+    }
+    void loadProfiles();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!profiles) return;
     if (profiles.length === 0) return;
     const stored = window.localStorage.getItem(currentProfileStorageKey);
     const profile = profiles.find((candidate) => candidate.id === stored) ?? profiles[0];
     setCurrentProfileId(profile.id);
-    window.localStorage.setItem(currentProfileStorageKey, profile.id);
+    rememberCurrentProfileId(profile.id);
   }, [profiles]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -58,7 +72,7 @@ export function LocalProfileGate({ initialProfiles }: { initialProfiles: Profile
     const profile = (await response.json()) as ProfileSummary;
     setProfiles([profile]);
     setCurrentProfileId(profile.id);
-    window.localStorage.setItem(currentProfileStorageKey, profile.id);
+    rememberCurrentProfileId(profile.id);
     setPending(false);
   }
 
@@ -71,7 +85,7 @@ export function LocalProfileGate({ initialProfiles }: { initialProfiles: Profile
         </div>
       ) : null}
 
-      {profiles.length === 0 ? (
+      {profiles?.length === 0 ? (
         <div className="setup-backdrop" role="dialog" aria-modal="true" aria-labelledby="profile-setup-title">
           <form className="setup-card pixel-panel" onSubmit={submit}>
             <p className="eyebrow">{t("profile.setupEyebrow")}</p>

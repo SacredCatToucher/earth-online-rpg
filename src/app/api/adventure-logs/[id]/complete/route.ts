@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { completeManualJournalEntry } from "@/server/services/adventure-log";
+import { resolveCurrentProfileIdFromRequest } from "@/server/services/profiles";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -10,7 +11,7 @@ export async function POST(request: Request, context: Context) {
   const { id } = await context.params;
   try {
     const input = completionInput.parse(await request.json());
-    const entry = await completeManualJournalEntry(id, input.completedDate);
+    const entry = await completeManualJournalEntry(id, input.completedDate, await resolveCurrentProfileIdFromRequest(request));
     for (const path of ["/", "/adventure-log", "/main-quests"]) {
       try {
         revalidatePath(path);

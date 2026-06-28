@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { isAdventureEventType } from "@/lib/adventure-log";
 import { db } from "@/lib/db";
+import { resolveCurrentProfileId } from "@/server/services/profiles";
 
 export type AdventureLogFilters = {
   search?: string;
@@ -8,6 +9,7 @@ export type AdventureLogFilters = {
   from?: string;
   to?: string;
   page?: number;
+  profileId?: string | null;
 };
 
 type AdventureLogRecord = Prisma.AdventureLogGetPayload<{
@@ -24,12 +26,17 @@ function validDate(value?: string) {
 }
 
 export async function listAdventureLogs(filters: AdventureLogFilters) {
+  const profileId = await resolveCurrentProfileId(filters.profileId);
+  if (!profileId) {
+    return { entries: [], totalMatches: 0, totalBranches: 0, page: Math.max(1, filters.page || 1), pageSize: 20, pageCount: 1 };
+  }
   const search = filters.search?.trim().slice(0, 100) ?? "";
   const from = validDate(filters.from);
   const to = validDate(filters.to);
   const page = Math.max(1, filters.page || 1);
   const pageSize = 20;
   const where: Prisma.AdventureLogWhereInput = {
+    profileId,
     deletedAt: null,
     ...(search ? { OR: [{ title: { contains: search } }, { description: { contains: search } }] } : {}),
     ...(filters.type && isAdventureEventType(filters.type) ? { eventType: filters.type } : {}),
@@ -72,9 +79,11 @@ export async function listAdventureLogs(filters: AdventureLogFilters) {
   };
 }
 
-export async function listAdventureLogParentOptions() {
+export async function listAdventureLogParentOptions(profileId?: string | null) {
+  const currentProfileId = await resolveCurrentProfileId(profileId);
+  if (!currentProfileId) return [];
   return db.adventureLog.findMany({
-    where: { deletedAt: null },
+    where: { profileId: currentProfileId, deletedAt: null },
     select: { id: true, title: true, parentId: true },
     orderBy: [{ startDate: "desc" }, { title: "asc" }],
   });

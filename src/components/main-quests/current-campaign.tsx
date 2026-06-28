@@ -17,6 +17,8 @@ function adventureLogLink(campaign: Campaign) {
 }
 
 export function CurrentCampaign({ campaign }: { campaign: Campaign }) {
+  if (campaign.status !== "ACTIVE") return null;
+
   const root = campaign.rootAdventureLog;
   const steps = root?.children ?? [];
   const progress = Math.min(100, Math.max(0, (campaign.currentValue / Math.max(1, campaign.targetValue)) * 100));

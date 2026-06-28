@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { eventDateFromInput, localDateInputValue } from "@/lib/dates";
 import { createSystemAdventureEvent, journalMilestoneCreateData } from "@/server/services/adventure-log";
+import { requireCurrentProfileId } from "@/server/services/profiles";
 
 export const createMainQuestInput = z
   .object({
@@ -46,12 +47,12 @@ export const createMainQuestNextStepInput = z.object({
 
 export type CreateMainQuestNextStepInput = z.input<typeof createMainQuestNextStepInput>;
 
-async function collectDescendantIds(tx: Prisma.TransactionClient, rootId: string) {
+async function collectDescendantIds(tx: Prisma.TransactionClient, profileId: string, rootId: string) {
   const ids = [rootId];
   let parentIds = [rootId];
   while (parentIds.length) {
     const children = await tx.adventureLog.findMany({
-      where: { parentId: { in: parentIds }, deletedAt: null },
+      where: { profileId, parentId: { in: parentIds }, deletedAt: null },
       select: { id: true, mainQuestId: true },
     });
     if (children.some((child) => child.mainQuestId)) {
@@ -63,18 +64,19 @@ async function collectDescendantIds(tx: Prisma.TransactionClient, rootId: string
   return ids;
 }
 
-export async function createMainQuest(input: CreateMainQuestInput) {
+export async function createMainQuest(input: CreateMainQuestInput, profileId?: string | null) {
   const parsed = createMainQuestInput.parse(input);
   const questId = randomUUID();
 
   try {
     return await db.$transaction(async (tx) => {
+      const currentProfileId = await requireCurrentProfileId(profileId, tx);
       const category = await tx.mainQuestCategory.findUnique({ where: { id: parsed.categoryId }, select: { id: true } });
       if (!category) throw new Error("Main Quest category not found.");
 
       if (parsed.status === "ACTIVE") {
         const activeQuest = await tx.mainQuest.findFirst({
-          where: { categoryId: parsed.categoryId, status: "ACTIVE", deletedAt: null },
+          where: { profileId: currentProfileId, categoryId: parsed.categoryId, status: "ACTIVE", deletedAt: null },
           select: { id: true },
         });
         if (activeQuest) throw new Error("This category already has an active Main Quest.");
@@ -84,6 +86,7 @@ export async function createMainQuest(input: CreateMainQuestInput) {
       await tx.mainQuest.create({
         data: {
           id: questId,
+          profileId: currentProfileId,
           categoryId: parsed.categoryId,
           title: parsed.title,
           description: parsed.description,
@@ -102,6 +105,7 @@ export async function createMainQuest(input: CreateMainQuestInput) {
           where: { id: rootAdventureLogId },
           select: {
             id: true,
+            profileId: true,
             title: true,
             description: true,
             startDate: true,
@@ -113,14 +117,16 @@ export async function createMainQuest(input: CreateMainQuestInput) {
           },
         });
         if (!root || root.deletedAt) throw new Error("Root Adventure Log entry not found.");
+        if (root.profileId !== currentProfileId) throw new Error("Root Adventure Log entry not found.");
         if (root.parentId) throw new Error("A Main Quest root must be a root Adventure Log entry.");
         if (root.mainQuestId || root.rootForQuest) throw new Error("This Adventure Log root already belongs to a Main Quest.");
 
-        const treeIds = await collectDescendantIds(tx, root.id);
+        const treeIds = await collectDescendantIds(tx, currentProfileId, root.id);
         await tx.adventureLog.updateMany({ where: { id: { in: treeIds } }, data: { mainQuestId: questId } });
         if (parsed.placeRootOnWorldMap && !root.locationId) {
           const location = await tx.mapLocation.create({
             data: await journalMilestoneCreateData(tx, {
+              profileId: currentProfileId,
               title: root.title,
               description: root.description,
               eventDate: root.startDate,
@@ -133,6 +139,7 @@ export async function createMainQuest(input: CreateMainQuestInput) {
           ? await tx.mapLocation.create({
               data: await journalMilestoneCreateData(tx, {
                 title: parsed.title,
+                profileId: currentProfileId,
                 description: parsed.description,
                 eventDate: startDate,
               }),
@@ -140,6 +147,7 @@ export async function createMainQuest(input: CreateMainQuestInput) {
           : null;
         const root = await tx.adventureLog.create({
           data: {
+            profileId: currentProfileId,
             eventType: "MANUAL_JOURNAL_ENTRY",
             title: parsed.title,
             description: parsed.description,
@@ -170,12 +178,13 @@ export async function createMainQuest(input: CreateMainQuestInput) {
   }
 }
 
-export async function completeMainQuest(id: string, completedDate?: string) {
+export async function completeMainQuest(id: string, completedDate?: string, profileId?: string | null) {
+  const currentProfileId = await requireCurrentProfileId(profileId);
   const completionDate = eventDateFromInput(z.iso.date().parse(completedDate ?? localDateInputValue()));
 
   return db.$transaction(async (tx) => {
     const quest = await tx.mainQuest.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, profileId: currentProfileId, deletedAt: null },
       include: { rootAdventureLog: true },
     });
     if (!quest) throw new Error("Main Quest not found.");
@@ -200,6 +209,7 @@ export async function completeMainQuest(id: string, completedDate?: string) {
       include: { category: true, rootAdventureLog: true },
     });
     const event = await createSystemAdventureEvent(tx, {
+      profileId: currentProfileId,
       eventType: "QUEST_COMPLETED",
       title: `${quest.title} completed`,
       description: "Main Quest completed.",
@@ -214,21 +224,22 @@ export async function completeMainQuest(id: string, completedDate?: string) {
   });
 }
 
-export async function activateMainQuest(id: string, input: ActivateMainQuestInput) {
+export async function activateMainQuest(id: string, input: ActivateMainQuestInput, profileId?: string | null) {
+  const currentProfileId = await requireCurrentProfileId(profileId);
   const parsed = activateMainQuestInput.parse(input);
   const startDate = eventDateFromInput(parsed.startDate);
 
   try {
     return await db.$transaction(async (tx) => {
       const quest = await tx.mainQuest.findFirst({
-        where: { id, deletedAt: null },
+        where: { id, profileId: currentProfileId, deletedAt: null },
         include: { rootAdventureLog: true },
       });
       if (!quest) throw new Error("Main Quest not found.");
       if (quest.status !== "DRAFT") throw new Error("Only draft Main Quests can be activated.");
 
       const activeQuest = await tx.mainQuest.findFirst({
-        where: { categoryId: quest.categoryId, status: "ACTIVE", deletedAt: null },
+        where: { profileId: currentProfileId, categoryId: quest.categoryId, status: "ACTIVE", deletedAt: null },
         select: { id: true },
       });
       if (activeQuest) throw new Error("This category already has an active Main Quest.");
@@ -260,10 +271,11 @@ export async function activateMainQuest(id: string, input: ActivateMainQuestInpu
   }
 }
 
-export async function updateMainQuestProgress(id: string, input: UpdateMainQuestProgressInput) {
+export async function updateMainQuestProgress(id: string, input: UpdateMainQuestProgressInput, profileId?: string | null) {
+  const currentProfileId = await requireCurrentProfileId(profileId);
   const parsed = updateMainQuestProgressInput.parse(input);
   const quest = await db.mainQuest.findFirst({
-    where: { id, deletedAt: null },
+    where: { id, profileId: currentProfileId, deletedAt: null },
     select: { id: true, targetValue: true },
   });
   if (!quest) throw new Error("Main Quest not found.");
@@ -275,13 +287,14 @@ export async function updateMainQuestProgress(id: string, input: UpdateMainQuest
   });
 }
 
-export async function createMainQuestNextStep(id: string, input: CreateMainQuestNextStepInput) {
+export async function createMainQuestNextStep(id: string, input: CreateMainQuestNextStepInput, profileId?: string | null) {
+  const currentProfileId = await requireCurrentProfileId(profileId);
   const parsed = createMainQuestNextStepInput.parse(input);
   const now = new Date();
 
   return db.$transaction(async (tx) => {
     const quest = await tx.mainQuest.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, profileId: currentProfileId, deletedAt: null },
       include: { rootAdventureLog: true },
     });
     if (!quest) throw new Error("Main Quest not found.");
@@ -293,6 +306,7 @@ export async function createMainQuestNextStep(id: string, input: CreateMainQuest
           data: {
             ...(await journalMilestoneCreateData(tx, {
               title: parsed.title,
+              profileId: currentProfileId,
               description: parsed.description,
               eventDate: now,
             })),
@@ -303,6 +317,7 @@ export async function createMainQuestNextStep(id: string, input: CreateMainQuest
 
     return tx.adventureLog.create({
       data: {
+        profileId: currentProfileId,
         eventType: "MANUAL_JOURNAL_ENTRY",
         title: parsed.title,
         description: parsed.description,

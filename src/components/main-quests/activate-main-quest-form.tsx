@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { localDateInputValue } from "@/lib/dates";
+import { profileFetch } from "@/lib/profiles";
 
 export function ActivateMainQuestForm({ id }: { id: string }) {
   const { t } = useLanguage();
@@ -16,7 +17,7 @@ export function ActivateMainQuestForm({ id }: { id: string }) {
     setPending(true);
     setError("");
     const data = new FormData(event.currentTarget);
-    const response = await fetch(`/api/main-quests/${id}/activate`, {
+    const response = await profileFetch(`/api/main-quests/${id}/activate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ startDate: data.get("startDate") }),

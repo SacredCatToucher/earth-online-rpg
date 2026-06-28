@@ -1,14 +1,17 @@
 import { db } from "@/lib/db";
+import { resolveCurrentProfileId } from "@/server/services/profiles";
 
-export async function listMainQuestOverview() {
+export async function listMainQuestOverview(profileId?: string | null) {
+  const currentProfileId = await resolveCurrentProfileId(profileId);
+  if (!currentProfileId) return { activeCampaigns: [], draftQuests: [], completedQuests: [] };
   const quests = await db.mainQuest.findMany({
-    where: { deletedAt: null },
+    where: { profileId: currentProfileId, deletedAt: null },
     include: {
       category: true,
       rootAdventureLog: {
         include: {
           children: {
-            where: { deletedAt: null },
+            where: { profileId: currentProfileId, deletedAt: null },
             orderBy: [{ startDate: "desc" }, { createdAt: "desc" }],
           },
         },

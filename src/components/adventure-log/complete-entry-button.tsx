@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { localDateInputValue } from "@/lib/dates";
+import { profileFetch } from "@/lib/profiles";
 
 const phaseCompletedEvent = "rpg-life:phase-completed";
 
@@ -41,7 +42,7 @@ export function CompleteEntryButton({ id }: { id: string }) {
     setPending(true);
     setMessage("");
     setError("");
-    const response = await fetch(`/api/adventure-logs/${id}/complete`, {
+    const response = await profileFetch(`/api/adventure-logs/${id}/complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ completedDate: localDateInputValue() }),

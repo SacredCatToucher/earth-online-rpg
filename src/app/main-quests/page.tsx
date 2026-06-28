@@ -6,7 +6,7 @@ import { CurrentCampaign } from "@/components/main-quests/current-campaign";
 import { GameNav } from "@/components/navigation/game-nav";
 import { db } from "@/lib/db";
 import { listMainQuestOverview } from "@/server/queries/main-quest";
-import { ensureFirstLaunchDefaults } from "@/server/services/bootstrap";
+import { resolveCurrentProfileIdFromCookie } from "@/server/services/profiles";
 
 export const dynamic = "force-dynamic";
 
@@ -37,9 +37,9 @@ function SecondaryQuest({ quest }: { quest: OverviewQuest }) {
 }
 
 export default async function MainQuestsPage() {
-  await ensureFirstLaunchDefaults();
+  const profileId = await resolveCurrentProfileIdFromCookie();
   const [overview, categories] = await Promise.all([
-    listMainQuestOverview(),
+    listMainQuestOverview(profileId),
     db.mainQuestCategory.findMany({ orderBy: [{ sortOrder: "asc" }, { title: "asc" }] }),
   ]);
 

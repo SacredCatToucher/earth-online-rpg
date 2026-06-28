@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { createMainQuest, createMainQuestInput } from "@/server/services/main-quest";
+import { resolveCurrentProfileIdFromRequest } from "@/server/services/profiles";
 
 export const runtime = "nodejs";
 
@@ -23,10 +24,12 @@ function revalidateQuestDataPages() {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const profileId = await resolveCurrentProfileIdFromRequest(request);
+    if (!profileId) return Response.json([]);
     const quests = await db.mainQuest.findMany({
-      where: { deletedAt: null },
+      where: { profileId, deletedAt: null },
       include: { category: true, rootAdventureLog: true },
       orderBy: [{ category: { sortOrder: "asc" } }, { createdAt: "desc" }],
     });
@@ -38,9 +41,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const profileId = await resolveCurrentProfileIdFromRequest(request);
+    if (!profileId) return Response.json({ error: "Profile not found." }, { status: 409 });
     const parsed = createMainQuestInput.safeParse(await request.json());
     if (!parsed.success) return Response.json({ error: "Invalid Main Quest input." }, { status: 400 });
-    const quest = await createMainQuest(parsed.data);
+    const quest = await createMainQuest(parsed.data, profileId);
     revalidateQuestDataPages();
     return Response.json(quest, { status: 201 });
   } catch (error) {

@@ -8,6 +8,11 @@ import { createBackupArchive, restoreBackupArchive } from "../../src/server/serv
 
 const marker = `Phase 1 foundation test ${randomUUID()}`;
 
+async function profileId() {
+  const existing = await db.profile.findFirst({ orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] });
+  return existing?.id ?? (await db.profile.create({ data: { name: `${marker} profile`, isDefault: true } })).id;
+}
+
 describe("Phase 1 foundation", () => {
   afterAll(async () => {
     await db.mainQuest.deleteMany({ where: { title: { startsWith: marker } } });
@@ -26,12 +31,13 @@ describe("Phase 1 foundation", () => {
 
   it("allows only one active Main Quest per category", async () => {
     const category = await db.mainQuestCategory.create({ data: { title: `${marker} category` } });
+    const currentProfileId = await profileId();
     await db.mainQuest.create({
-      data: { categoryId: category.id, title: `${marker} active one`, progressType: "PERCENTAGE", status: "ACTIVE" },
+      data: { profileId: currentProfileId, categoryId: category.id, title: `${marker} active one`, progressType: "PERCENTAGE", status: "ACTIVE" },
     });
     await expect(
       db.mainQuest.create({
-        data: { categoryId: category.id, title: `${marker} active two`, progressType: "PERCENTAGE", status: "ACTIVE" },
+        data: { profileId: currentProfileId, categoryId: category.id, title: `${marker} active two`, progressType: "PERCENTAGE", status: "ACTIVE" },
       }),
     ).rejects.toThrow();
   });

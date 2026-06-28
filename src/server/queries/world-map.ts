@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { resolveCurrentProfileId } from "@/server/services/profiles";
 
 export type WorldMapConnection = {
   sourceId: string;
@@ -53,10 +54,12 @@ function buildConnections(locations: readonly ConnectionLocation[], useBranchAwa
   return connections;
 }
 
-export async function listWorldMap() {
+export async function listWorldMap(profileId?: string | null) {
+  const currentProfileId = await resolveCurrentProfileId(profileId);
+  if (!currentProfileId) return { locations: [], connections: [], worlds: [] };
   const [locations, categories] = await Promise.all([
     db.mapLocation.findMany({
-      where: { deletedAt: null },
+      where: { profileId: currentProfileId, deletedAt: null },
       include: {
         logs: {
           where: { deletedAt: null },
@@ -100,10 +103,10 @@ export async function listWorldMap() {
       orderBy: [{ eventDate: "asc" }, { createdAt: "asc" }],
     }),
     db.mainQuestCategory.findMany({
-      where: { quests: { some: { deletedAt: null } } },
+      where: { quests: { some: { profileId: currentProfileId, deletedAt: null } } },
       include: {
         quests: {
-          where: { deletedAt: null },
+          where: { profileId: currentProfileId, deletedAt: null },
           select: { id: true, title: true, description: true, status: true, createdAt: true },
           orderBy: [{ createdAt: "desc" }],
         },

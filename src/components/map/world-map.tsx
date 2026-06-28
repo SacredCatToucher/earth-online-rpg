@@ -17,6 +17,7 @@ type WorldLocation = {
     id: string;
     title: string;
     status: string;
+    mainQuestStatus: string | null;
     parent: { id: string; title: string; locationId: string | null } | null;
   } | null;
 };
@@ -93,6 +94,8 @@ function displayDate(value: string) {
 }
 
 function stageState(location: WorldLocation, isFrontier: boolean): { className: string; labelKey: TranslationKey } {
+  if (location.isMainQuestRoot && location.linkedLog?.mainQuestStatus === "DRAFT") return { className: "traveled", labelKey: "common.draft" };
+  if (location.isMainQuestRoot && location.linkedLog?.mainQuestStatus === "COMPLETED") return { className: "completed", labelKey: "worldMap.completed" };
   if (location.linkedLog?.status === "ONGOING") return { className: "active", labelKey: "worldMap.active" };
   if (location.linkedLog?.status === "COMPLETED") return { className: "completed", labelKey: "worldMap.completed" };
   if (isFrontier) return { className: "frontier", labelKey: "worldMap.latest" };

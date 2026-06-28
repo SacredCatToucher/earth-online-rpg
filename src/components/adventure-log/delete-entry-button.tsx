@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useLanguage } from "@/components/i18n/language-provider";
+import { profileFetch } from "@/lib/profiles";
 
 export function DeleteEntryButton({ id }: { id: string }) {
   const { t } = useLanguage();
@@ -11,7 +12,7 @@ export function DeleteEntryButton({ id }: { id: string }) {
   async function remove() {
     if (!window.confirm(t("journal.deleteConfirm"))) return;
     setPending(true);
-    const response = await fetch(`/api/adventure-logs/${id}`, { method: "DELETE" });
+    const response = await profileFetch(`/api/adventure-logs/${id}`, { method: "DELETE" });
     if (response.ok) router.refresh();
     else setPending(false);
   }

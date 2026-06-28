@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { localDateInputValue } from "@/lib/dates";
+import { profileFetch } from "@/lib/profiles";
 
 export function CompleteMainQuestButton({ id }: { id: string }) {
   const { t } = useLanguage();
@@ -15,7 +16,7 @@ export function CompleteMainQuestButton({ id }: { id: string }) {
     if (!window.confirm(t("mainQuest.completeConfirm"))) return;
     setPending(true);
     setError("");
-    const response = await fetch(`/api/main-quests/${id}/complete`, {
+    const response = await profileFetch(`/api/main-quests/${id}/complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ completedDate: localDateInputValue() }),

@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useLanguage } from "@/components/i18n/language-provider";
+import { profileFetch } from "@/lib/profiles";
 
 export function FirstMinuteMapForm() {
   const { t } = useLanguage();
@@ -20,7 +21,7 @@ export function FirstMinuteMapForm() {
       return;
     }
 
-    const response = await fetch("/api/first-minute", {
+    const response = await profileFetch("/api/first-minute", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ moments }),

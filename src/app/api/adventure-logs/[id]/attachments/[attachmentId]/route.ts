@@ -1,12 +1,15 @@
 import { db } from "@/lib/db";
+import { resolveCurrentProfileIdFromRequest } from "@/server/services/profiles";
 import { deleteStoredAttachments, readStoredAttachment } from "@/server/storage/attachments";
 
 export const runtime = "nodejs";
 type Context = { params: Promise<{ id: string; attachmentId: string }> };
 
-export async function GET(_: Request, context: Context) {
+export async function GET(request: Request, context: Context) {
   const { id, attachmentId } = await context.params;
-  const attachment = await db.attachment.findFirst({ where: { id: attachmentId, adventureLogId: id, adventureLog: { deletedAt: null } } });
+  const profileId = await resolveCurrentProfileIdFromRequest(request);
+  if (!profileId) return Response.json({ error: "Attachment not found." }, { status: 404 });
+  const attachment = await db.attachment.findFirst({ where: { id: attachmentId, adventureLogId: id, adventureLog: { profileId, deletedAt: null } } });
   if (!attachment) return Response.json({ error: "Attachment not found." }, { status: 404 });
   try {
     const bytes = await readStoredAttachment(attachment.storageName);
@@ -26,9 +29,11 @@ export async function GET(_: Request, context: Context) {
   }
 }
 
-export async function DELETE(_: Request, context: Context) {
+export async function DELETE(request: Request, context: Context) {
   const { id, attachmentId } = await context.params;
-  const attachment = await db.attachment.findFirst({ where: { id: attachmentId, adventureLogId: id } });
+  const profileId = await resolveCurrentProfileIdFromRequest(request);
+  if (!profileId) return Response.json({ error: "Attachment not found." }, { status: 404 });
+  const attachment = await db.attachment.findFirst({ where: { id: attachmentId, adventureLogId: id, adventureLog: { profileId } } });
   if (!attachment) return Response.json({ error: "Attachment not found." }, { status: 404 });
   await db.attachment.delete({ where: { id: attachment.id } });
   await deleteStoredAttachments([attachment.storageName]);

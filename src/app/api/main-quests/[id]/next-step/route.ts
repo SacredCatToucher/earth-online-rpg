@@ -1,13 +1,28 @@
+import { revalidatePath } from "next/cache";
 import { createMainQuestNextStep, createMainQuestNextStepInput } from "@/server/services/main-quest";
+import { resolveCurrentProfileIdFromRequest } from "@/server/services/profiles";
 
 type Context = { params: Promise<{ id: string }> };
+
+function revalidateQuestDataPages() {
+  for (const path of ["/", "/main-quests", "/adventure-log"]) {
+    try {
+      revalidatePath(path);
+    } catch {
+      // Route-handler tests do not provide Next's request cache context.
+    }
+  }
+}
 
 export async function POST(request: Request, context: Context) {
   const { id } = await context.params;
   try {
+    const profileId = await resolveCurrentProfileIdFromRequest(request);
     const parsed = createMainQuestNextStepInput.safeParse(await request.json());
     if (!parsed.success) return Response.json({ error: "Phase title is required." }, { status: 400 });
-    return Response.json(await createMainQuestNextStep(id, parsed.data), { status: 201 });
+    const step = await createMainQuestNextStep(id, parsed.data, profileId);
+    revalidateQuestDataPages();
+    return Response.json(step, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message === "Main Quest not found." || message === "Main Quest root journey not found.") {

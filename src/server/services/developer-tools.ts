@@ -2,6 +2,7 @@ import { DEFAULT_QUEST_CATEGORIES, DEFAULT_SKILLS } from "@/lib/constants";
 import { dailyQuestWeekday, normalizeDailyQuestWeekdays } from "@/lib/daily-quest";
 import { db } from "@/lib/db";
 import { ensureFirstLaunchDefaults } from "@/server/services/bootstrap";
+import { ensureDefaultProfile } from "@/server/services/profiles";
 import { deleteStoredAttachments } from "@/server/storage/attachments";
 
 async function deleteAttachmentFiles() {
@@ -43,10 +44,12 @@ export async function resetDemoData() {
   phaseTwoDate.setDate(now.getDate() - 2);
 
   await db.$transaction(async (tx) => {
+    const profileId = (await ensureDefaultProfile(tx)).id;
     await tx.character.create({ data: { name: "Demo Adventurer" } });
     const category = await tx.mainQuestCategory.findUniqueOrThrow({ where: { title: "Career" } });
     const rootLocation = await tx.mapLocation.create({
       data: {
+        profileId,
         title: "Demo Career Road",
         description: "The first visible milestone for the demo journey.",
         eventDate: phaseOneDate,
@@ -57,6 +60,7 @@ export async function resetDemoData() {
     });
     const phaseLocation = await tx.mapLocation.create({
       data: {
+        profileId,
         title: "Completed demo phase",
         description: "A completed phase placed on the World Map for route testing.",
         eventDate: phaseTwoDate,
@@ -67,6 +71,7 @@ export async function resetDemoData() {
     });
     const activePhaseLocation = await tx.mapLocation.create({
       data: {
+        profileId,
         title: "Ongoing demo phase",
         description: "An active phase placed on the World Map for progress testing.",
         eventDate: now,
@@ -77,6 +82,7 @@ export async function resetDemoData() {
     });
     const quest = await tx.mainQuest.create({
       data: {
+        profileId,
         categoryId: category.id,
         title: "Demo Career Road",
         description: "A demo Main Quest for testing the full RPG Life loop.",
@@ -90,6 +96,7 @@ export async function resetDemoData() {
     });
     const root = await tx.adventureLog.create({
       data: {
+        profileId,
         eventType: "MANUAL_JOURNAL_ENTRY",
         title: "Demo Career Road",
         description: "Main Quest root for the demo journey.",
@@ -109,6 +116,7 @@ export async function resetDemoData() {
     await tx.mapLocation.update({ where: { id: activePhaseLocation.id }, data: { mainQuestId: quest.id } });
     await tx.adventureLog.create({
       data: {
+        profileId,
         eventType: "MANUAL_JOURNAL_ENTRY",
         title: "Completed demo phase",
         description: "A finished phase that branches from the Main Quest root.",
@@ -124,6 +132,7 @@ export async function resetDemoData() {
     });
     await tx.adventureLog.create({
       data: {
+        profileId,
         eventType: "MANUAL_JOURNAL_ENTRY",
         title: "Ongoing demo phase",
         description: "An active phase for testing parent-child event tree behavior.",

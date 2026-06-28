@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/i18n/language-provider";
+import { profileFetch } from "@/lib/profiles";
 
 export function MainQuestProgressForm({ id, currentValue, targetValue, unit }: { id: string; currentValue: number; targetValue: number; unit: string }) {
   const { t } = useLanguage();
@@ -15,7 +16,7 @@ export function MainQuestProgressForm({ id, currentValue, targetValue, unit }: {
     setPending(true);
     setError("");
     const data = new FormData(event.currentTarget);
-    const response = await fetch(`/api/main-quests/${id}/progress`, {
+    const response = await profileFetch(`/api/main-quests/${id}/progress`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ currentValue: Number(data.get("currentValue")) }),

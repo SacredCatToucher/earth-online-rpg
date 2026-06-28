@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/i18n/language-provider";
+import { profileFetch } from "@/lib/profiles";
 
 export type CreatedNextStep = {
   id: string;
@@ -49,7 +50,7 @@ export function AddNextStepForm({
     setError("");
     setMessage("");
     const data = new FormData(event.currentTarget);
-    const response = await fetch(`/api/main-quests/${questId}/next-step`, {
+    const response = await profileFetch(`/api/main-quests/${questId}/next-step`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

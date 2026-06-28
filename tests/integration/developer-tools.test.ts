@@ -6,6 +6,11 @@ import { listWorldMap } from "../../src/server/queries/world-map";
 import { clearAllLocalData, resetDemoData } from "../../src/server/services/developer-tools";
 import { POST } from "../../src/app/api/developer-tools/route";
 
+async function profileId() {
+  const existing = await db.profile.findFirst({ orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] });
+  return existing?.id ?? (await db.profile.create({ data: { name: "Developer tools test profile", isDefault: true } })).id;
+}
+
 async function requestDeveloperTool(action: string) {
   return POST(new Request("http://localhost/api/developer-tools", {
     method: "POST",
@@ -22,8 +27,10 @@ describe("Developer Tools data reset", () => {
   it("clears local test data while preserving required defaults", async () => {
     await clearAllLocalData();
     const category = await db.mainQuestCategory.create({ data: { title: "Developer tools test category" } });
+    const currentProfileId = await profileId();
     const quest = await db.mainQuest.create({
       data: {
+        profileId: currentProfileId,
         categoryId: category.id,
         title: "Developer tools test quest",
         progressType: "COUNT",
@@ -31,9 +38,10 @@ describe("Developer Tools data reset", () => {
       },
     });
     await db.dailyQuest.create({ data: { title: "Developer tools test daily", daysOfWeek: "MON" } });
-    const location = await db.mapLocation.create({ data: { title: "Developer tools test map", eventDate: new Date() } });
+    const location = await db.mapLocation.create({ data: { profileId: currentProfileId, title: "Developer tools test map", eventDate: new Date() } });
     await db.adventureLog.create({
       data: {
+        profileId: currentProfileId,
         eventType: "MANUAL_JOURNAL_ENTRY",
         title: "Developer tools test log",
         origin: "MANUAL",

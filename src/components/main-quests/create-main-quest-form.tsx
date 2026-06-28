@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/i18n/language-provider";
+import { profileFetch } from "@/lib/profiles";
 
 type CategoryOption = { id: string; title: string };
 
@@ -12,14 +13,17 @@ export function CreateMainQuestForm({ categories }: { categories: CategoryOption
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [refreshing, startRefresh] = useTransition();
+  const isBusy = pending || refreshing;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isBusy) return;
     setPending(true);
     setError("");
     const data = new FormData(event.currentTarget);
     const startDate = String(data.get("startDate") ?? "");
-    const response = await fetch("/api/main-quests", {
+    const response = await profileFetch("/api/main-quests", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -41,9 +45,11 @@ export function CreateMainQuestForm({ categories }: { categories: CategoryOption
       setPending(false);
       return;
     }
+    startRefresh(() => {
+      router.refresh();
+    });
     form.current?.reset();
     setPending(false);
-    router.refresh();
   }
 
   return (
@@ -65,7 +71,7 @@ export function CreateMainQuestForm({ categories }: { categories: CategoryOption
         <label className="milestone-toggle quest-root-map-toggle"><input name="placeRootOnWorldMap" type="checkbox" value="true" /><span><strong>{t("mainQuest.placeRoot")}</strong><small>{t("mainQuest.placeRootHelp")}</small></span></label>
       </div>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
-      <button className="pixel-button quest-submit" type="submit" disabled={pending || !categories.length}>{pending ? t("mainQuest.creating") : t("mainQuest.create")}</button>
+      <button className="pixel-button quest-submit" type="submit" disabled={isBusy || !categories.length}>{isBusy ? t("mainQuest.creating") : t("mainQuest.create")}</button>
     </form>
   );
 }

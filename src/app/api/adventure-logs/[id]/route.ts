@@ -1,15 +1,18 @@
 import { db } from "@/lib/db";
 import { softDeleteAdventureEntry, updateManualJournalEntry } from "@/server/services/adventure-log";
 import { journalFormInput } from "@/app/api/adventure-logs/input";
+import { resolveCurrentProfileIdFromRequest } from "@/server/services/profiles";
 
 export const runtime = "nodejs";
 
 type Context = { params: Promise<{ id: string }> };
 
-export async function GET(_: Request, context: Context) {
+export async function GET(request: Request, context: Context) {
   const { id } = await context.params;
+  const profileId = await resolveCurrentProfileIdFromRequest(request);
+  if (!profileId) return Response.json({ error: "Journal entry not found." }, { status: 404 });
   const entry = await db.adventureLog.findFirst({
-    where: { id, deletedAt: null },
+    where: { id, profileId, deletedAt: null },
     include: {
       attachments: true,
       parent: { select: { id: true, title: true } },
@@ -27,6 +30,7 @@ export async function PATCH(request: Request, context: Context) {
       id,
       journalFormInput(form),
       form.getAll("attachments").filter((item): item is File => item instanceof File && item.size > 0),
+      await resolveCurrentProfileIdFromRequest(request),
     );
     return Response.json(entry);
   } catch (error) {
@@ -35,10 +39,10 @@ export async function PATCH(request: Request, context: Context) {
   }
 }
 
-export async function DELETE(_: Request, context: Context) {
+export async function DELETE(request: Request, context: Context) {
   const { id } = await context.params;
   try {
-    await softDeleteAdventureEntry(id);
+    await softDeleteAdventureEntry(id, await resolveCurrentProfileIdFromRequest(request));
     return new Response(null, { status: 204 });
   } catch {
     return Response.json({ error: "Journal entry not found." }, { status: 404 });

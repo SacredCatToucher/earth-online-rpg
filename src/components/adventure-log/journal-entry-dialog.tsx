@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { localDateInputValue } from "@/lib/dates";
+import { profileFetch } from "@/lib/profiles";
 
 type Attachment = { id: string; originalName: string; mimeType: string; sizeBytes: number };
 type ParentOption = { id: string; title: string; parentId: string | null };
@@ -52,7 +53,7 @@ export function JournalEntryDialog({ initial, parent, parentOptions = [] }: { in
     event.preventDefault();
     setPending(true);
     setError("");
-    const response = await fetch(initial ? `/api/adventure-logs/${initial.id}` : "/api/adventure-logs", {
+    const response = await profileFetch(initial ? `/api/adventure-logs/${initial.id}` : "/api/adventure-logs", {
       method: initial ? "PATCH" : "POST",
       body: new FormData(event.currentTarget),
     });
@@ -77,7 +78,7 @@ export function JournalEntryDialog({ initial, parent, parentOptions = [] }: { in
 
   async function removeAttachment(attachmentId: string) {
     if (!initial || !window.confirm(t("journal.removeConfirm"))) return;
-    const response = await fetch(`/api/adventure-logs/${initial.id}/attachments/${attachmentId}`, { method: "DELETE" });
+    const response = await profileFetch(`/api/adventure-logs/${initial.id}/attachments/${attachmentId}`, { method: "DELETE" });
     if (response.ok) setAttachments((current) => current.filter((item) => item.id !== attachmentId));
     else setError(t("journal.removeError"));
   }

@@ -6,6 +6,7 @@ import { JournalTree } from "@/components/adventure-log/journal-tree";
 import { ADVENTURE_EVENT_TYPES } from "@/lib/constants";
 import { EVENT_PRESENTATION } from "@/lib/adventure-log";
 import { listAdventureLogParentOptions, listAdventureLogs } from "@/server/queries/adventure-log";
+import { resolveCurrentProfileIdFromCookie } from "@/server/services/profiles";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +15,10 @@ type PageProps = { searchParams: Promise<Record<string, string | string[] | unde
 function textParam(value: string | string[] | undefined) { return typeof value === "string" ? value : ""; }
 export default async function AdventureLogPage({ searchParams }: PageProps) {
   const params = await searchParams;
+  const profileId = await resolveCurrentProfileIdFromCookie();
   const filters = { search: textParam(params.search), type: textParam(params.type), from: textParam(params.from), to: textParam(params.to), page: Number(textParam(params.page)) || 1 };
   const hasFilters = Boolean(filters.search || filters.type || filters.from || filters.to);
-  const [result, parentOptions] = await Promise.all([listAdventureLogs(filters), listAdventureLogParentOptions()]);
+  const [result, parentOptions] = await Promise.all([listAdventureLogs({ ...filters, profileId }), listAdventureLogParentOptions(profileId)]);
   const queryForPage = (page: number) => {
     const next = new URLSearchParams();
     if (filters.search) next.set("search", filters.search);

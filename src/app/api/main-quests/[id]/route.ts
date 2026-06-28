@@ -1,14 +1,17 @@
 import { db } from "@/lib/db";
+import { resolveCurrentProfileIdFromRequest } from "@/server/services/profiles";
 
 export const runtime = "nodejs";
 
 type Context = { params: Promise<{ id: string }> };
 
-export async function GET(_: Request, context: Context) {
+export async function GET(request: Request, context: Context) {
   const { id } = await context.params;
   try {
+    const profileId = await resolveCurrentProfileIdFromRequest(request);
+    if (!profileId) return Response.json({ error: "Main Quest not found." }, { status: 404 });
     const quest = await db.mainQuest.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, profileId, deletedAt: null },
       include: {
         category: true,
         rootAdventureLog: true,

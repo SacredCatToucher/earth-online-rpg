@@ -7,6 +7,8 @@ import { T } from "@/components/i18n/language-provider";
 import { LifeWorldsMap } from "@/components/map/life-worlds-map";
 import { db } from "@/lib/db";
 import { listWorldMap } from "@/server/queries/world-map";
+import { ensureFirstLaunchDefaults } from "@/server/services/bootstrap";
+import { resolveCurrentProfileIdFromCookie } from "@/server/services/profiles";
 
 export const dynamic = "force-dynamic";
 const showDeveloperTools = process.env.NODE_ENV !== "production";
@@ -25,6 +27,7 @@ function serializeLocation(location: Awaited<ReturnType<typeof listWorldMap>>["l
       id: location.logs[0].id,
       title: location.logs[0].title,
       status: location.logs[0].status,
+      mainQuestStatus: location.logs[0].mainQuest?.status ?? null,
       parent: location.logs[0].parent ? {
         id: location.logs[0].parent.id,
         title: location.logs[0].parent.title,
@@ -37,8 +40,10 @@ function serializeLocation(location: Awaited<ReturnType<typeof listWorldMap>>["l
 function textParam(value: string | string[] | undefined) { return typeof value === "string" ? value : ""; }
 
 export default async function Home({ searchParams }: PageProps) {
+  await ensureFirstLaunchDefaults();
   const params = await searchParams;
-  const [character, map] = await Promise.all([db.character.findFirst(), listWorldMap()]);
+  const profileId = await resolveCurrentProfileIdFromCookie();
+  const [character, map] = await Promise.all([db.character.findFirst(), listWorldMap(profileId)]);
   const showFirstMinute = map.locations.length === 0;
 
   return (
