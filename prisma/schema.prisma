@@ -22,6 +22,8 @@ model Profile {
   mainQuests   MainQuest[]
   adventureLog AdventureLog[]
   mapLocations MapLocation[]
+  dailyQuests  DailyQuest[]
+  dailyQuestCompletions DailyQuestCompletion[]
 }
 
 model Character {
@@ -90,6 +92,7 @@ model MainQuest {
 
 model DailyQuest {
   id                        String                 @id @default(cuid())
+  profileId                 String
   title                     String
   description               String                 @default("")
   expReward                 Int                    @default(0)
@@ -103,21 +106,27 @@ model DailyQuest {
   defaultContributionAmount Float?
   createdAt                 DateTime               @default(now())
   updatedAt                 DateTime               @updatedAt
+  profile                   Profile                @relation(fields: [profileId], references: [id], onDelete: Cascade)
   completions               DailyQuestCompletion[]
   attachments               Attachment[]
+
+  @@index([profileId, isActive, title])
 }
 
 model DailyQuestCompletion {
   id                 String     @id @default(cuid())
+  profileId          String
   dailyQuestId       String
   questDate          String
   completedAt        DateTime   @default(now())
   expAwarded         Int
   contributionAmount Float?
+  profile            Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
   dailyQuest         DailyQuest @relation(fields: [dailyQuestId], references: [id], onDelete: Cascade)
 
-  @@unique([dailyQuestId, questDate])
+  @@unique([profileId, dailyQuestId, questDate])
   @@index([dailyQuestId, questDate])
+  @@index([profileId, dailyQuestId, questDate])
 }
 
 model Skill {

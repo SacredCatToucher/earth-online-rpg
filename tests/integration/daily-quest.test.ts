@@ -19,6 +19,10 @@ import {
 
 const marker = `Phase 5 Daily Quest test ${randomUUID()}`;
 
+async function createProfile(label: string) {
+  return db.profile.create({ data: { name: `${marker} ${label}` } });
+}
+
 function todayWeekdays(): DailyQuestWeekday[] {
   return [dailyQuestWeekday()];
 }
@@ -29,6 +33,7 @@ function anotherWeekday(): DailyQuestWeekday {
 
 afterAll(async () => {
   await db.dailyQuest.deleteMany({ where: { title: { startsWith: marker } } });
+  await db.profile.deleteMany({ where: { name: { startsWith: marker } } });
   await db.$disconnect();
 });
 
@@ -207,6 +212,7 @@ describe("Daily Quest completion foundation", () => {
     beforeWeek.setDate(beforeWeek.getDate() - 1);
     await db.dailyQuestCompletion.create({
       data: {
+        profileId: quest.profileId,
         dailyQuestId: quest.id,
         questDate: canonicalDailyQuestDate(beforeWeek),
         expAwarded: 0,
@@ -300,5 +306,47 @@ describe("Daily Quest completion foundation", () => {
   it("reports a missing quest for completion and undo", async () => {
     await expect(completeDailyQuestToday("missing-daily-quest")).rejects.toThrow("Daily Quest not found.");
     await expect(undoDailyQuestCompletionToday("missing-daily-quest")).rejects.toThrow("Daily Quest not found.");
+  });
+
+  it("scopes list, completion, undo, and weekly contribution by profile", async () => {
+    const profileA = await createProfile("profile A");
+    const profileB = await createProfile("profile B");
+    const questA = await createDailyQuest({
+      title: `${marker} scoped daily`,
+      weekdays: todayWeekdays(),
+      contributionEnabled: true,
+      weeklyTargetAmount: 20,
+      contributionUnit: "km",
+      defaultContributionAmount: 2,
+    }, profileA.id);
+    const questB = await createDailyQuest({
+      title: `${marker} scoped daily`,
+      weekdays: todayWeekdays(),
+      contributionEnabled: true,
+      weeklyTargetAmount: 20,
+      contributionUnit: "km",
+      defaultContributionAmount: 2,
+    }, profileB.id);
+
+    await completeDailyQuestToday(questA.id, { contributionAmount: 4 }, profileA.id);
+
+    const listA = await listDailyQuests(profileA.id);
+    const listB = await listDailyQuests(profileB.id);
+
+    expect(listA.some((quest) => quest.id === questA.id)).toBe(true);
+    expect(listA.some((quest) => quest.id === questB.id)).toBe(false);
+    expect(listA.find((quest) => quest.id === questA.id)).toMatchObject({ isCompletedToday: true, weeklyProgressAmount: 4 });
+    expect(listB.some((quest) => quest.id === questB.id)).toBe(true);
+    expect(listB.some((quest) => quest.id === questA.id)).toBe(false);
+    expect(listB.find((quest) => quest.id === questB.id)).toMatchObject({ isCompletedToday: false, weeklyProgressAmount: 0 });
+
+    await expect(completeDailyQuestToday(questA.id, { contributionAmount: 3 }, profileB.id)).rejects.toThrow("Daily Quest not found.");
+    await expect(undoDailyQuestCompletionToday(questA.id, profileB.id)).rejects.toThrow("Daily Quest not found.");
+
+    await undoDailyQuestCompletionToday(questA.id, profileA.id);
+    expect((await listDailyQuests(profileA.id)).find((quest) => quest.id === questA.id)).toMatchObject({
+      isCompletedToday: false,
+      weeklyProgressAmount: 0,
+    });
   });
 });

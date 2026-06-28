@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { DAILY_QUEST_WEEKDAYS, type DailyQuestWeekday } from "@/lib/daily-quest";
+import { profileFetch } from "@/lib/profiles";
 
 export function CreateDailyQuestForm() {
   const { t } = useLanguage();
@@ -13,6 +14,8 @@ export function CreateDailyQuestForm() {
   const [contributionEnabled, setContributionEnabled] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [refreshing, startRefresh] = useTransition();
+  const isBusy = pending || refreshing;
 
   function toggleWeekday(day: DailyQuestWeekday, checked: boolean) {
     setWeekdays((current) => checked ? [...current, day] : current.filter((item) => item !== day));
@@ -20,10 +23,11 @@ export function CreateDailyQuestForm() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isBusy) return;
     setPending(true);
     setError("");
     const data = new FormData(event.currentTarget);
-    const response = await fetch("/api/daily-quests", {
+    const response = await profileFetch("/api/daily-quests", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -46,8 +50,8 @@ export function CreateDailyQuestForm() {
     form.current?.reset();
     setWeekdays([...DAILY_QUEST_WEEKDAYS]);
     setContributionEnabled(false);
+    startRefresh(() => router.refresh());
     setPending(false);
-    router.refresh();
   }
 
   return (
@@ -66,7 +70,7 @@ export function CreateDailyQuestForm() {
         </div>
       ) : null}
       {error ? <p className="form-error" role="alert">{error}</p> : null}
-      <button className="pixel-button daily-submit" type="submit" disabled={pending}>{pending ? t("daily.creating") : t("daily.create")}</button>
+      <button className="pixel-button daily-submit" type="submit" disabled={isBusy}>{isBusy ? t("daily.creating") : t("daily.create")}</button>
     </form>
   );
 }

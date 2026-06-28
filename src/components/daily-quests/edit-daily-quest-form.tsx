@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { DAILY_QUEST_WEEKDAYS, parseDailyQuestWeekdays, type DailyQuestWeekday } from "@/lib/daily-quest";
+import { profileFetch } from "@/lib/profiles";
 
 type EditableDailyQuest = {
   id: string;
@@ -24,6 +25,8 @@ export function EditDailyQuestForm({ quest }: { quest: EditableDailyQuest }) {
   const [contributionEnabled, setContributionEnabled] = useState(quest.contributionEnabled);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [refreshing, startRefresh] = useTransition();
+  const isBusy = pending || refreshing;
 
   function toggleWeekday(day: DailyQuestWeekday, checked: boolean) {
     setWeekdays((current) => checked ? [...current, day] : current.filter((item) => item !== day));
@@ -31,10 +34,11 @@ export function EditDailyQuestForm({ quest }: { quest: EditableDailyQuest }) {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isBusy) return;
     setPending(true);
     setError("");
     const data = new FormData(event.currentTarget);
-    const response = await fetch(`/api/daily-quests/${quest.id}`, {
+    const response = await profileFetch(`/api/daily-quests/${quest.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -54,8 +58,8 @@ export function EditDailyQuestForm({ quest }: { quest: EditableDailyQuest }) {
       setPending(false);
       return;
     }
+    startRefresh(() => router.refresh());
     setPending(false);
-    router.refresh();
   }
 
   return (
@@ -75,7 +79,7 @@ export function EditDailyQuestForm({ quest }: { quest: EditableDailyQuest }) {
           </div>
         ) : null}
         {error ? <p className="form-error" role="alert">{error}</p> : null}
-        <button type="submit" disabled={pending}>{pending ? t("daily.saving") : t("daily.saveChanges")}</button>
+        <button type="submit" disabled={isBusy}>{isBusy ? t("daily.saving") : t("daily.saveChanges")}</button>
       </form>
     </details>
   );

@@ -37,7 +37,7 @@ describe("Developer Tools data reset", () => {
         status: "ACTIVE",
       },
     });
-    await db.dailyQuest.create({ data: { title: "Developer tools test daily", daysOfWeek: "MON" } });
+    await db.dailyQuest.create({ data: { profileId: currentProfileId, title: "Developer tools test daily", daysOfWeek: "MON" } });
     const location = await db.mapLocation.create({ data: { profileId: currentProfileId, title: "Developer tools test map", eventDate: new Date() } });
     await db.adventureLog.create({
       data: {

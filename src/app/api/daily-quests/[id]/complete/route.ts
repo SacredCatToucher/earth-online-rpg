@@ -1,4 +1,6 @@
+import { revalidatePath } from "next/cache";
 import { completeDailyQuestInput, completeDailyQuestToday, undoDailyQuestCompletionToday } from "@/server/services/daily-quest";
+import { resolveCurrentProfileIdFromRequest } from "@/server/services/profiles";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -13,7 +15,9 @@ const serviceErrors = new Map<string, number>([
 
 async function respond(action: () => Promise<unknown>, fallback: string) {
   try {
-    return Response.json(await action());
+    const result = await action();
+    revalidatePath("/daily-quests");
+    return Response.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     const status = serviceErrors.get(message);
@@ -27,10 +31,12 @@ export async function POST(request: Request, context: Context) {
   const body = await request.json().catch(() => ({}));
   const parsed = completeDailyQuestInput.safeParse(body);
   if (!parsed.success) return Response.json({ error: "Invalid Daily Quest completion input." }, { status: 400 });
-  return respond(() => completeDailyQuestToday(id, parsed.data), "Daily Quest could not be completed.");
+  const profileId = await resolveCurrentProfileIdFromRequest(request);
+  return respond(() => completeDailyQuestToday(id, parsed.data, profileId), "Daily Quest could not be completed.");
 }
 
-export async function DELETE(_request: Request, context: Context) {
+export async function DELETE(request: Request, context: Context) {
   const { id } = await context.params;
-  return respond(() => undoDailyQuestCompletionToday(id), "Daily Quest completion could not be undone.");
+  const profileId = await resolveCurrentProfileIdFromRequest(request);
+  return respond(() => undoDailyQuestCompletionToday(id, profileId), "Daily Quest completion could not be undone.");
 }

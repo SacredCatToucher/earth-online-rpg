@@ -1,13 +1,17 @@
 import { db } from "@/lib/db";
 import { canonicalDailyQuestDate, dailyQuestWeekRange, isDailyQuestScheduledForDate } from "@/lib/daily-quest";
+import { resolveCurrentProfileId } from "@/server/services/profiles";
 
-export async function listDailyQuests() {
+export async function listDailyQuests(profileId?: string | null) {
+  const currentProfileId = await resolveCurrentProfileId(profileId);
+  if (!currentProfileId) return [];
   const today = new Date();
   const week = dailyQuestWeekRange(today);
   const quests = await db.dailyQuest.findMany({
+    where: { profileId: currentProfileId },
     include: {
       completions: {
-        where: { questDate: canonicalDailyQuestDate(today) },
+        where: { profileId: currentProfileId, questDate: canonicalDailyQuestDate(today) },
         select: { id: true, contributionAmount: true },
       },
       _count: { select: { completions: true } },
@@ -17,6 +21,7 @@ export async function listDailyQuests() {
   const weeklyTotals = await db.dailyQuestCompletion.groupBy({
     by: ["dailyQuestId"],
     where: {
+      profileId: currentProfileId,
       dailyQuestId: { in: quests.map((quest) => quest.id) },
       questDate: { gte: week.start, lte: week.end },
       contributionAmount: { not: null },

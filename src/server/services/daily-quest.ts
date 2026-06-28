@@ -8,6 +8,7 @@ import {
   normalizeDailyQuestWeekdays,
 } from "@/lib/daily-quest";
 import { db } from "@/lib/db";
+import { requireCurrentProfileId } from "@/server/services/profiles";
 
 const weekdayInput = z.array(z.enum(DAILY_QUEST_WEEKDAYS)).min(1);
 const optionalPositiveNumber = z.preprocess(
@@ -47,10 +48,12 @@ export const completeDailyQuestInput = z.object({
 
 export type CompleteDailyQuestInput = z.input<typeof completeDailyQuestInput>;
 
-export async function createDailyQuest(input: DailyQuestInput) {
+export async function createDailyQuest(input: DailyQuestInput, profileId?: string | null) {
+  const currentProfileId = await requireCurrentProfileId(profileId);
   const parsed = dailyQuestInput.parse(input);
   return db.dailyQuest.create({
     data: {
+      profileId: currentProfileId,
       title: parsed.title,
       description: parsed.description,
       daysOfWeek: normalizeDailyQuestWeekdays(parsed.weekdays),
@@ -64,9 +67,10 @@ export async function createDailyQuest(input: DailyQuestInput) {
   });
 }
 
-export async function updateDailyQuest(id: string, input: DailyQuestInput) {
+export async function updateDailyQuest(id: string, input: DailyQuestInput, profileId?: string | null) {
+  const currentProfileId = await requireCurrentProfileId(profileId);
   const parsed = dailyQuestInput.parse(input);
-  const quest = await db.dailyQuest.findUnique({ where: { id }, select: { id: true } });
+  const quest = await db.dailyQuest.findFirst({ where: { id, profileId: currentProfileId }, select: { id: true } });
   if (!quest) throw new Error("Daily Quest not found.");
 
   return db.dailyQuest.update({
@@ -84,10 +88,12 @@ export async function updateDailyQuest(id: string, input: DailyQuestInput) {
   });
 }
 
-export async function weeklyContributionTotal(id: string, date = new Date()) {
+export async function weeklyContributionTotal(id: string, profileId?: string | null, date = new Date()) {
+  const currentProfileId = await requireCurrentProfileId(profileId);
   const week = dailyQuestWeekRange(date);
   const result = await db.dailyQuestCompletion.aggregate({
     where: {
+      profileId: currentProfileId,
       dailyQuestId: id,
       questDate: { gte: week.start, lte: week.end },
       contributionAmount: { not: null },
@@ -97,11 +103,12 @@ export async function weeklyContributionTotal(id: string, date = new Date()) {
   return result._sum.contributionAmount ?? 0;
 }
 
-export async function completeDailyQuestToday(id: string, input: CompleteDailyQuestInput = {}) {
+export async function completeDailyQuestToday(id: string, input: CompleteDailyQuestInput = {}, profileId?: string | null) {
+  const currentProfileId = await requireCurrentProfileId(profileId);
   const parsed = completeDailyQuestInput.parse(input);
   const today = new Date();
   const questDate = canonicalDailyQuestDate(today);
-  const quest = await db.dailyQuest.findUnique({ where: { id } });
+  const quest = await db.dailyQuest.findFirst({ where: { id, profileId: currentProfileId } });
   if (!quest) throw new Error("Daily Quest not found.");
   if (!quest.isActive) throw new Error("Paused Daily Quests cannot be completed.");
   if (!isDailyQuestScheduledForDate(quest.daysOfWeek, today)) {
@@ -114,11 +121,11 @@ export async function completeDailyQuestToday(id: string, input: CompleteDailyQu
 
   try {
     const completion = await db.dailyQuestCompletion.create({
-      data: { dailyQuestId: quest.id, questDate, expAwarded: 0, contributionAmount },
+      data: { profileId: currentProfileId, dailyQuestId: quest.id, questDate, expAwarded: 0, contributionAmount },
     });
     return {
       ...completion,
-      weeklyProgressAmount: quest.contributionEnabled ? await weeklyContributionTotal(quest.id, today) : null,
+      weeklyProgressAmount: quest.contributionEnabled ? await weeklyContributionTotal(quest.id, currentProfileId, today) : null,
     };
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -128,12 +135,13 @@ export async function completeDailyQuestToday(id: string, input: CompleteDailyQu
   }
 }
 
-export async function undoDailyQuestCompletionToday(id: string) {
-  const quest = await db.dailyQuest.findUnique({ where: { id }, select: { id: true } });
+export async function undoDailyQuestCompletionToday(id: string, profileId?: string | null) {
+  const currentProfileId = await requireCurrentProfileId(profileId);
+  const quest = await db.dailyQuest.findFirst({ where: { id, profileId: currentProfileId }, select: { id: true } });
   if (!quest) throw new Error("Daily Quest not found.");
 
-  const completion = await db.dailyQuestCompletion.findUnique({
-    where: { dailyQuestId_questDate: { dailyQuestId: quest.id, questDate: canonicalDailyQuestDate() } },
+  const completion = await db.dailyQuestCompletion.findFirst({
+    where: { profileId: currentProfileId, dailyQuestId: quest.id, questDate: canonicalDailyQuestDate() },
     select: { id: true },
   });
   if (!completion) throw new Error("Daily Quest has no completion to undo today.");

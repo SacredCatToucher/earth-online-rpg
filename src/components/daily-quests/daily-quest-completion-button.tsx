@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/i18n/language-provider";
+import { profileFetch } from "@/lib/profiles";
 
 type ContributionSettings = {
   enabled: boolean;
@@ -16,6 +17,10 @@ type ContributionSettings = {
 
 function formatAmount(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function updateTodayCardClass(id: string, completed: boolean) {
+  document.querySelector(`[data-daily-quest-id="${id}"]`)?.classList.toggle("completed", completed);
 }
 
 export function DailyQuestCompletionButton({
@@ -45,7 +50,7 @@ export function DailyQuestCompletionButton({
     setPending(true);
     setError("");
     setMessage("");
-    const response = await fetch(`/api/daily-quests/${id}/complete`, {
+    const response = await profileFetch(`/api/daily-quests/${id}/complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(isProgressQuest ? { contributionAmount: amount } : {}),
@@ -57,6 +62,7 @@ export function DailyQuestCompletionButton({
       return;
     }
     setIsCompleted(true);
+    updateTodayCardClass(id, true);
     setShowContributionForm(false);
     if (typeof body.weeklyProgressAmount === "number") {
       setWeeklyProgress(body.weeklyProgressAmount);
@@ -71,7 +77,7 @@ export function DailyQuestCompletionButton({
     setError("");
     setMessage("");
     const previousTodayAmount = Number(contributionAmount) || contribution?.defaultContributionAmount || 0;
-    const response = await fetch(`/api/daily-quests/${id}/complete`, { method: "DELETE" });
+    const response = await profileFetch(`/api/daily-quests/${id}/complete`, { method: "DELETE" });
     const body = (await response.json()) as { error?: string };
     if (!response.ok) {
       setError(body.error ?? t("daily.completionError"));
@@ -79,6 +85,7 @@ export function DailyQuestCompletionButton({
       return;
     }
     setIsCompleted(false);
+    updateTodayCardClass(id, false);
     if (isProgressQuest) setWeeklyProgress((current) => Math.max(0, current - (contribution?.todayContributionAmount ?? previousTodayAmount)));
     router.refresh();
     setPending(false);

@@ -5,11 +5,13 @@ import { T } from "@/components/i18n/language-provider";
 import { GameNav } from "@/components/navigation/game-nav";
 import { formatDailyQuestCadence } from "@/lib/daily-quest";
 import { listDailyQuests } from "@/server/queries/daily-quest";
+import { resolveCurrentProfileIdFromCookie } from "@/server/services/profiles";
 
 export const dynamic = "force-dynamic";
 
 export default async function DailyQuestsPage() {
-  const quests = await listDailyQuests();
+  const profileId = await resolveCurrentProfileIdFromCookie();
+  const quests = await listDailyQuests(profileId);
   const todaysQuests = quests.filter((quest) => (quest.isActive && quest.isScheduledToday) || quest.isCompletedToday);
   const allTodayComplete = todaysQuests.length > 0 && todaysQuests.every((quest) => quest.isCompletedToday);
   const contributionFor = (quest: (typeof quests)[number]) => ({
@@ -29,7 +31,7 @@ export default async function DailyQuestsPage() {
         <div className="daily-section-heading"><div><p className="eyebrow">TODAY'S PATH</p><h2 id="daily-today-heading">Meaningful steps for today</h2></div><p>Each action is a small piece of the longer journey you are choosing.</p></div>
         <div className="daily-today-list">
           {todaysQuests.length ? todaysQuests.map((quest) => (
-            <article className={`daily-today-card pixel-panel ${quest.isCompletedToday ? "completed" : ""}`} key={quest.id}>
+            <article className={`daily-today-card pixel-panel ${quest.isCompletedToday ? "completed" : ""}`} data-daily-quest-id={quest.id} key={quest.id}>
               <h3>{quest.title}</h3>
               {quest.description ? <p>{quest.description}</p> : null}
               <DailyQuestCompletionButton id={quest.id} completed={quest.isCompletedToday} contribution={contributionFor(quest)} />

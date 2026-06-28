@@ -147,6 +147,7 @@ export async function resetDemoData() {
     });
     await tx.dailyQuest.create({
       data: {
+        profileId,
         title: "Demo daily practice",
         description: "A recurring step connected to the demo journey.",
         daysOfWeek: normalizeDailyQuestWeekdays([dailyQuestWeekday()]),
@@ -156,6 +157,7 @@ export async function resetDemoData() {
     });
     await tx.dailyQuest.create({
       data: {
+        profileId,
         title: "Run today",
         description: "A progress Daily Quest for testing weekly contribution.",
         daysOfWeek: normalizeDailyQuestWeekdays([dailyQuestWeekday()]),

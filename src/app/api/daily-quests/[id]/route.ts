@@ -1,4 +1,6 @@
+import { revalidatePath } from "next/cache";
 import { dailyQuestInput, updateDailyQuest } from "@/server/services/daily-quest";
+import { resolveCurrentProfileIdFromRequest } from "@/server/services/profiles";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -7,7 +9,9 @@ export async function PATCH(request: Request, context: Context) {
   try {
     const parsed = dailyQuestInput.safeParse(await request.json());
     if (!parsed.success) return Response.json({ error: "Invalid Daily Quest input." }, { status: 400 });
-    return Response.json(await updateDailyQuest(id, parsed.data));
+    const quest = await updateDailyQuest(id, parsed.data, await resolveCurrentProfileIdFromRequest(request));
+    revalidatePath("/daily-quests");
+    return Response.json(quest);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message === "Daily Quest not found.") return Response.json({ error: message }, { status: 404 });
