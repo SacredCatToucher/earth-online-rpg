@@ -13,6 +13,14 @@ model AppSetting {
   updatedAt DateTime @updatedAt
 }
 
+model Profile {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Character {
   id         String           @id @default(cuid())
   name       String
