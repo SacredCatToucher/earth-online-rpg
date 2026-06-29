@@ -19,6 +19,7 @@ model Profile {
   isDefault    Boolean       @default(false)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  character    Character?
   mainQuests   MainQuest[]
   adventureLog AdventureLog[]
   mapLocations MapLocation[]
@@ -28,12 +29,14 @@ model Profile {
 
 model Character {
   id         String           @id @default(cuid())
+  profileId  String?          @unique
   name       String
   avatarPath String?
   level      Int              @default(1)
   currentExp Int              @default(0)
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
+  profile    Profile?         @relation(fields: [profileId], references: [id], onDelete: Cascade)
   expEntries ExpTransaction[]
 }
 

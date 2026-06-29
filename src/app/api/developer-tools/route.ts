@@ -1,9 +1,20 @@
+import { revalidatePath } from "next/cache";
 import { clearAllLocalData, resetDemoData } from "@/server/services/developer-tools";
 
 export const runtime = "nodejs";
 
 function developerToolsEnabled() {
   return process.env.NODE_ENV !== "production";
+}
+
+function revalidateDeveloperToolPages() {
+  for (const path of ["/", "/main-quests", "/adventure-log", "/daily-quests"]) {
+    try {
+      revalidatePath(path);
+    } catch {
+      // Route-handler tests do not provide Next's request cache context.
+    }
+  }
 }
 
 export async function POST(request: Request) {
@@ -19,10 +30,12 @@ export async function POST(request: Request) {
   try {
     if (body?.action === "clear") {
       await clearAllLocalData();
+      revalidateDeveloperToolPages();
       return Response.json({ message: "All local data has been cleared." });
     }
     if (body?.action === "reset-demo") {
       await resetDemoData();
+      revalidateDeveloperToolPages();
       return Response.json({ message: "Demo data has been reset." });
     }
     return Response.json({ error: "Unknown developer tool action." }, { status: 400 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { profileFetch } from "@/lib/profiles";
 
 export function CharacterSetup() {
   const [error, setError] = useState("");
@@ -11,7 +12,7 @@ export function CharacterSetup() {
     setPending(true);
     setError("");
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/character", {
+    const response = await profileFetch("/api/character", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: form.get("name") }),

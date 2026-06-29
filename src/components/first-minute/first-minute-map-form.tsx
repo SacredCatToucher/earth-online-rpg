@@ -1,22 +1,28 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { profileFetch } from "@/lib/profiles";
 
 export function FirstMinuteMapForm() {
+  const router = useRouter();
   const { t } = useLanguage();
+  const submitting = useRef(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting.current) return;
+    submitting.current = true;
     setPending(true);
     setError("");
     const form = new FormData(event.currentTarget);
     const moments = ["moment1", "moment2", "moment3"].map((name) => String(form.get(name) ?? "").trim());
     if (moments.some((moment) => !moment)) {
       setError(t("firstMinute.error"));
+      submitting.current = false;
       setPending(false);
       return;
     }
@@ -29,10 +35,11 @@ export function FirstMinuteMapForm() {
     const body = (await response.json().catch(() => ({}))) as { worldId?: string; error?: string };
     if (!response.ok || !body.worldId) {
       setError(body.error ?? t("firstMinute.error"));
+      submitting.current = false;
       setPending(false);
       return;
     }
-    window.location.replace(`/?world=${encodeURIComponent(body.worldId)}`);
+    router.replace(`/?world=${encodeURIComponent(body.worldId)}`);
   }
 
   return (

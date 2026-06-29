@@ -25,9 +25,15 @@ export async function POST(request: Request) {
   }
 
   try {
-    const isFirstProfile = (await db.profile.count()) === 0;
-    const profile = await db.profile.create({
-      data: { name: parsed.data.name, isDefault: isFirstProfile },
+    const profile = await db.$transaction(async (tx) => {
+      const isFirstProfile = (await tx.profile.count()) === 0;
+      return tx.profile.create({
+        data: {
+          name: parsed.data.name,
+          isDefault: isFirstProfile,
+          character: { create: { name: parsed.data.name } },
+        },
+      });
     });
     return Response.json(profile, { status: 201 });
   } catch (error) {

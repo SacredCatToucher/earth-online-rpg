@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { ensureCharacterForProfile } from "@/server/services/character";
 import { requireCurrentProfileId } from "@/server/services/profiles";
 
 export const firstMinuteInput = z.object({
@@ -14,9 +15,7 @@ export async function createFirstMinuteMap(input: FirstMinuteInput, profileId?: 
 
   return db.$transaction(async (tx) => {
     const currentProfileId = await requireCurrentProfileId(profileId, tx);
-    if (!(await tx.character.count())) {
-      await tx.character.create({ data: { name: "Adventurer" } });
-    }
+    await ensureCharacterForProfile(currentProfileId, tx);
 
     const entries = [];
     for (const [index, title] of parsed.moments.entries()) {

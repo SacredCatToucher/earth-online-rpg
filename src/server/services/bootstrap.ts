@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { DEFAULT_QUEST_CATEGORIES, DEFAULT_SKILLS } from "@/lib/constants";
 import { db } from "@/lib/db";
 import { defaultProfileName } from "@/lib/profiles";
+import { ensureDefaultProfileCharacter } from "@/server/services/character";
 
 async function hasUserCreatedData(tx: Prisma.TransactionClient) {
   const [characters, mainQuests, dailyQuests, adventureLogs, mapLocations] = await Promise.all([
@@ -39,5 +40,6 @@ export async function ensureFirstLaunchDefaults() {
       update: {},
       create: { key: "timezone", value: process.env.RPG_TIMEZONE ?? "Asia/Taipei" },
     });
+    await ensureDefaultProfileCharacter(tx);
   });
 }

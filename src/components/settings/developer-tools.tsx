@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/i18n/language-provider";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -33,11 +34,15 @@ async function readDeveloperToolResponse(response: Response) {
 
 export function DeveloperTools() {
   const { t } = useLanguage();
+  const router = useRouter();
+  const runningAction = useRef<ToolAction | null>(null);
   const [status, setStatus] = useState("");
   const [pendingAction, setPendingAction] = useState<ToolAction | null>(null);
 
   async function runAction(action: ToolAction) {
+    if (runningAction.current) return;
     if (!window.confirm(t(copy[action].confirmation))) return;
+    runningAction.current = action;
     setPendingAction(action);
     setStatus(t(copy[action].pending));
     try {
@@ -49,14 +54,21 @@ export function DeveloperTools() {
       const result = await readDeveloperToolResponse(response);
       if (!response.ok) {
         setStatus(result.error && response.status === 403 ? result.error : t(copy[action].error));
+        runningAction.current = null;
         setPendingAction(null);
         return;
       }
-      setStatus(`${t(copy[action].success)} ${t("dev.reloading")}`);
+      setStatus(t(copy[action].success));
+      runningAction.current = null;
       setPendingAction(null);
-      window.setTimeout(() => window.location.replace("/"), 50);
+      if (window.location.pathname === "/" && !window.location.search) {
+        router.refresh();
+      } else {
+        router.replace("/");
+      }
     } catch {
       setStatus(t(copy[action].error));
+      runningAction.current = null;
       setPendingAction(null);
     }
   }

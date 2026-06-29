@@ -5,8 +5,10 @@ import { afterAll, describe, expect, it } from "vitest";
 import { BACKUP_FORMAT, DEFAULT_QUEST_CATEGORIES, DEFAULT_SKILLS } from "../../src/lib/constants";
 import { db } from "../../src/lib/db";
 import { createBackupArchive, restoreBackupArchive } from "../../src/server/services/backup";
+import { POST as createProfile } from "../../src/app/api/profiles/route";
 
 const marker = `Phase 1 foundation test ${randomUUID()}`;
+const profileMarker = `P1 ${randomUUID().slice(0, 8)}`;
 
 async function profileId() {
   const existing = await db.profile.findFirst({ orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] });
@@ -17,6 +19,7 @@ describe("Phase 1 foundation", () => {
   afterAll(async () => {
     await db.mainQuest.deleteMany({ where: { title: { startsWith: marker } } });
     await db.mainQuestCategory.deleteMany({ where: { title: { startsWith: marker } } });
+    await db.profile.deleteMany({ where: { OR: [{ name: { startsWith: marker } }, { name: { startsWith: profileMarker } }] } });
     await db.$disconnect();
   });
 
@@ -40,6 +43,20 @@ describe("Phase 1 foundation", () => {
         data: { profileId: currentProfileId, categoryId: category.id, title: `${marker} active two`, progressType: "PERCENTAGE", status: "ACTIVE" },
       }),
     ).rejects.toThrow();
+  });
+
+  it("creates a matching Character when a Profile is created", async () => {
+    const name = `${profileMarker} character`;
+    const response = await createProfile(new Request("http://localhost/api/profiles", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }));
+    const profile = await response.json() as { id: string; name: string };
+    const character = await db.character.findUnique({ where: { profileId: profile.id } });
+
+    expect(response.status).toBe(201);
+    expect(profile.name).toBe(name);
+    expect(character).toMatchObject({ profileId: profile.id, name });
   });
 
   it("exports and restores a versioned SQLite backup", async () => {

@@ -5,8 +5,8 @@ import { FirstMinuteMapForm } from "@/components/first-minute/first-minute-map-f
 import { GameNav } from "@/components/navigation/game-nav";
 import { T } from "@/components/i18n/language-provider";
 import { LifeWorldsMap } from "@/components/map/life-worlds-map";
-import { db } from "@/lib/db";
 import { listWorldMap } from "@/server/queries/world-map";
+import { getCurrentProfileCharacter } from "@/server/services/character";
 import { ensureFirstLaunchDefaults } from "@/server/services/bootstrap";
 import { resolveCurrentProfileIdFromCookie } from "@/server/services/profiles";
 
@@ -43,7 +43,10 @@ export default async function Home({ searchParams }: PageProps) {
   await ensureFirstLaunchDefaults();
   const params = await searchParams;
   const profileId = await resolveCurrentProfileIdFromCookie();
-  const [character, map] = await Promise.all([db.character.findFirst(), listWorldMap(profileId)]);
+  const [character, map] = await Promise.all([
+    profileId ? getCurrentProfileCharacter(profileId) : null,
+    listWorldMap(profileId),
+  ]);
   const showFirstMinute = map.locations.length === 0;
 
   return (
